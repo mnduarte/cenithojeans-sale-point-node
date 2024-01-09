@@ -1,0 +1,12 @@
+const express = require("express");
+const router = express.Router();
+const { Controllers } = require("../controllers/employee.controller");
+
+//Search Employee by id
+router.get("/employees", Controllers.getAll);
+
+router.post("/add-employee", Controllers.create);
+router.put("/update-employee", Controllers.update);
+router.delete("/remove-employee/:id", Controllers.delete);
+
+module.exports = router;
