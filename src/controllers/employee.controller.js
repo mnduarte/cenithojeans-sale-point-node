@@ -4,21 +4,31 @@ const BaseModel = require("../models/base.model");
 const Employee = new BaseModel("Employee");
 // @Services
 
-const getAllEmployees = async () =>
-  Employee.aggregate([
+const getAllEmployees = async (store = "ALL") => {
+  const filter = store === "ALL" ? {} : { store };
+
+  const employees = await Employee.aggregate([
+    {
+      $match: filter,
+    },
     {
       $project: {
         id: "$_id",
         name: 1,
         active: 1,
+        store: 1,
         _id: 0,
       },
     },
   ]);
 
-Controllers.getAll = async (req, res) => {
+  return employees;
+};
+
+Controllers.getAllByUser = async (req, res) => {
   try {
-    const employee = await getAllEmployees();
+    const { store } = req.body;
+    const employee = await getAllEmployees(store);
 
     res.send({
       results: employee,
@@ -30,10 +40,11 @@ Controllers.getAll = async (req, res) => {
 
 Controllers.create = async (req, res) => {
   try {
-    const { name, active } = req.body;
+    const { name, store, active } = req.body;
 
     await Employee.create({
       name,
+      store,
       active,
     });
 
@@ -49,10 +60,10 @@ Controllers.create = async (req, res) => {
 
 Controllers.update = async (req, res) => {
   try {
-    const { id, name, active } = req.body;
+    const { id, name, store, active } = req.body;
     const updatedEmployee = await Employee.findByIdAndUpdate(
       { _id: id },
-      { name, active }
+      { name, store, active }
     );
 
     if (updatedEmployee) {
@@ -70,7 +81,7 @@ Controllers.update = async (req, res) => {
 };
 
 Controllers.delete = async (req, res) => {
-  const { id } = req.params;
+  const { id, store } = req.params;
 
   try {
     const deletedEmployee = await Employee.remove({ _id: id });

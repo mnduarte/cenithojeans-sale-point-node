@@ -4,16 +4,10 @@ const { autoIncrement } = require("mongoose-plugin-autoinc");
 const Autopopulate = require("mongoose-autopopulate");
 const _ = require("lodash");
 
-const EmployeeSchema = mongoose.Schema(
+const StoreSchema = mongoose.Schema(
   {
     name: {
       type: String,
-    },
-    store: {
-      type: String,
-    },
-    active: {
-      type: Boolean,
     },
   },
   {
@@ -28,16 +22,16 @@ const EmployeeSchema = mongoose.Schema(
  * Instance method to expose to the LatBoard API only the related fields.
  */
 
-EmployeeSchema.methods.toJSON = function () {
+StoreSchema.methods.toJSON = function () {
   const obj = this.toObject();
 
   return _.omit(obj, ["__v"]);
 };
 
-EmployeeSchema.plugin(autoIncrement, {
-  model: "Employee",
+StoreSchema.plugin(autoIncrement, {
+  model: "Store",
   startAt: 1,
 });
-EmployeeSchema.plugin(Autopopulate);
+StoreSchema.plugin(Autopopulate);
 
-module.exports = mongoose.model("Employee", EmployeeSchema);
+module.exports = mongoose.model("Store", StoreSchema);

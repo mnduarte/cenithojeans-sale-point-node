@@ -3,6 +3,7 @@ const router = express.Router();
 const userRoutes = require("./user.route");
 const priceRoutes = require("./price.route");
 const employeeRoutes = require("./employee.route");
+const storeRoutes = require("./store.route");
 const saleRoutes = require("./sale.route");
 /*
 // Función para agregar retraso
@@ -18,6 +19,7 @@ router.use(async (req, res, next) => {
 router.use("/user", userRoutes);
 router.use("/price", priceRoutes);
 router.use("/employee", employeeRoutes);
+router.use("/store", storeRoutes);
 router.use("/sale", saleRoutes);
 
 module.exports = router;

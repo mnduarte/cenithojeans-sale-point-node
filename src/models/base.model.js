@@ -6,6 +6,7 @@ const schemas = {
   Sale: require("../schemas/sale.schema"),
   Employee: require("../schemas/employee.schema"),
   Price: require("../schemas/price.schema"),
+  Store: require("../schemas/store.schema"),
   UpdateDB: require("../schemas/update-db.schema"),
 };
 

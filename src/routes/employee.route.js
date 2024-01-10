@@ -3,7 +3,7 @@ const router = express.Router();
 const { Controllers } = require("../controllers/employee.controller");
 
 //Search Employee by id
-router.get("/employees", Controllers.getAll);
+router.post("/employees", Controllers.getAllByUser);
 
 router.post("/add-employee", Controllers.create);
 router.put("/update-employee", Controllers.update);
