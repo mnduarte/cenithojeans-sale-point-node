@@ -44,6 +44,7 @@ Controllers.getSales = async (req, res) => {
           employee: 1,
           typeSale: 1,
           typePayment: 1,
+          typeShipment: 1,
           items: 1,
           subTotalItems: 1,
           devolutionItems: 1,
@@ -82,33 +83,35 @@ Controllers.create = async (req, res) => {
       subTotalDevolutionItems,
       percentageToDisccountOrAdd,
       username,
+      numOrder,
+      typeShipment,
       total,
     } = req.body;
-
-    let newOrder = null;
 
     const now = new Date();
     now.setHours(now.getHours() - 3);
 
-    if (typeSale === "local") {
-      const lastSaleByEmployee = await Sale.findOne({
-        employee,
-      })
-        .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
-        .limit(1);
+    const lastSaleByEmployee = await Sale.findOne({
+      employee,
+    })
+      .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
+      .limit(1);
 
-      newOrder =
-        !lastSaleByEmployee || lastSaleByEmployee.order >= 100
-          ? 1
-          : lastSaleByEmployee.order + 1;
-    }
+    const numOrderLocal =
+      !lastSaleByEmployee || lastSaleByEmployee.order >= 100
+        ? 1
+        : lastSaleByEmployee.order + 1;
+
+    const numOrderLocalOrPedido =
+      typeSale === "local" ? numOrderLocal : numOrder;
 
     await Sale.create({
       store,
-      order: newOrder,
+      order: numOrderLocalOrPedido,
       employee,
       typeSale,
       typePayment,
+      typeShipment,
       items,
       subTotalItems,
       devolutionItems,
@@ -127,14 +130,24 @@ Controllers.create = async (req, res) => {
   }
 };
 
-const templateRecieve = (
+const mappingPriceWithConcept = {
+  bolsas: "Bolsas",
+  envio: "Envio",
+  recargoPorMenor: "Recargo Por Menor",
+};
+
+const templateRecieve = async ({
   pricesSelected,
   devolutionPricesSelected,
   percentageToDisccountOrAdd,
-  seller,
   username,
-  totalPrice
-) => {
+  seller,
+  typeSale,
+  numOrder,
+  employee,
+  pricesWithconcepts,
+  totalPrice,
+}) => {
   const alignRight = (text, width) => {
     const spaces = width - text.length;
     return " ".repeat(spaces) + text;
@@ -148,6 +161,20 @@ const templateRecieve = (
             formatCurrency(item.price),
             10
           )} | ${alignRight(formatCurrency(item.quantity * item.price), 10)}`
+      )
+      .join("\n");
+  };
+
+  const pricesWithToString = (prices) => {
+    return prices
+      .map(
+        (item) =>
+          `  ${mappingPriceWithConcept[item.concept]}: ${alignRight(
+            item.quantity.toString(),
+            18 - mappingPriceWithConcept[item.concept].length
+          )} x ${formatCurrency(item.price)} | ${formatCurrency(
+            item.quantity * item.price
+          )}`
       )
       .join("\n");
   };
@@ -169,9 +196,23 @@ const templateRecieve = (
       totalPrice *
         calculateTotalPercentage(Math.abs(percentageToDisccountOrAdd)));
 
+  const lastSaleByEmployee = await Sale.findOne({
+    employee,
+  })
+    .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
+    .limit(1);
+
+  const numOrderLocal =
+    !lastSaleByEmployee || lastSaleByEmployee.order >= 100
+      ? 1
+      : lastSaleByEmployee.order + 1;
+
+  const numOrderLocalOrPedido = typeSale === "local" ? numOrderLocal : numOrder;
+
   let tpl = `Cenitho Jeans - ${formattedDateTime}\n
-Bogota 3419  (011) 2091-3841
-Helguera 569 (011) 2080-1916\n`;
+Bogota 3419  (011) 2080-1916
+Helguera 569 (011) 2091-3841
+www.cenitho.com\n`;
 
   if (seller.length) {
     tpl =
@@ -183,7 +224,7 @@ Helguera 569 (011) 2080-1916\n`;
   tpl =
     tpl +
     `
-  Cajero: ${username}
+  Cajero: ${username} | ${typeSale} | N° ${numOrderLocalOrPedido}
   
   Items:\n${pricesToString(pricesSelected)}
   Total de prendas: ${pricesSelected.reduce(
@@ -197,6 +238,13 @@ Helguera 569 (011) 2080-1916\n`;
       `
 
   Devoluciones:\n${pricesToString(devolutionPricesSelected)}`;
+  }
+
+  if (pricesWithconcepts.length) {
+    tpl =
+      tpl +
+      `
+    \n${pricesWithToString(pricesWithconcepts)}`;
   }
 
   tpl =
@@ -226,7 +274,9 @@ Helguera 569 (011) 2080-1916\n`;
   tpl =
     tpl +
     `
-    \nTicket no valido como factura`;
+    \nLos cambios pueden realizarse dentro 
+de los 20 dias presentando este ticket
+\nTicket no valido como factura`;
 
   return tpl;
 };
@@ -237,19 +287,27 @@ Controllers.print = async (req, res) => {
       pricesSelected,
       devolutionPricesSelected,
       percentageToDisccountOrAdd,
-      seller,
       username,
+      seller,
+      employee,
+      typeSale,
+      numOrder,
+      pricesWithconcepts,
       totalPrice,
     } = req.body;
 
-    const tpl = templateRecieve(
+    const tpl = await templateRecieve({
       pricesSelected,
       devolutionPricesSelected,
       percentageToDisccountOrAdd,
-      seller,
       username,
-      totalPrice
-    );
+      seller,
+      employee,
+      typeSale,
+      numOrder,
+      pricesWithconcepts,
+      totalPrice,
+    });
 
     const formattedData = `${tpl}\n\n\n\n`;
 
@@ -267,6 +325,8 @@ Controllers.print = async (req, res) => {
         console.log(err);
       },
     });
+
+    //console.log(tpl);
 
     res.send({ results: "Se imprimio!" });
   } catch (error) {

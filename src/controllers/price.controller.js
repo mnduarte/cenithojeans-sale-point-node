@@ -47,6 +47,34 @@ Controllers.create = async (req, res) => {
   }
 };
 
+Controllers.deleteSelectedPrices = async (req, res) => {
+  try {
+    const { itemsIdSelected, deleteAll } = req.body;
+
+    if (deleteAll) {
+      await Price.removeAll();
+
+      const prices = await getAllPrices();
+
+      res.send({
+        results: prices,
+      });
+      return;
+    }
+
+    const idList = itemsIdSelected.map(({ id }) => id);
+    await Price.removeMany({ _id: { $in: idList } });
+
+    const prices = await getAllPrices();
+
+    res.send({
+      results: prices,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error al borrar precios" });
+  }
+};
+
 Controllers.update = async (req, res) => {
   try {
     const { id, price, active } = req.body;

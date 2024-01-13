@@ -7,5 +7,6 @@ router.get("/prices", Controllers.getAll);
 router.post("/add-price", Controllers.create);
 router.put("/update-price", Controllers.update);
 router.delete("/remove-price/:id", Controllers.delete);
+router.post("/delete-selected-price", Controllers.deleteSelectedPrices);
 
 module.exports = router;

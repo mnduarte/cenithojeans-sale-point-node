@@ -86,6 +86,22 @@ class BaseModel {
   }
 
   /**
+   * Remove multiple documents based on a query.
+   *
+   * @param {Object} query
+   */
+  removeMany(query) {
+    return this.Schema.deleteMany(query);
+  }
+
+  /**
+   * Remove all documents from the collection.
+   */
+  removeAll() {
+    return this.Schema.deleteMany({});
+  }
+
+  /**
    * Retrieves all the accounts on the database without limits.
    *
    */

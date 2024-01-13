@@ -21,6 +21,9 @@ const SaleSchema = mongoose.Schema(
     typePayment: {
       type: String,
     },
+    typeShipment: {
+      type: String,
+    },
     items: {
       type: Number,
     },
