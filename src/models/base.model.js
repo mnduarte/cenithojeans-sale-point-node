@@ -7,6 +7,7 @@ const schemas = {
   Employee: require("../schemas/employee.schema"),
   Price: require("../schemas/price.schema"),
   Store: require("../schemas/store.schema"),
+  Cashflow: require("../schemas/cashflow.schema"),
   UpdateDB: require("../schemas/update-db.schema"),
 };
 
@@ -196,12 +197,10 @@ class BaseModel {
    * Updates all documents that match filter.
    * You need to use $set to not override the doc.
    *
-   * @param {Function} filter
-   * @param {Function} doc
-   * @param {Function} options
+   * @param {Function} query
    */
-  updateMany(filter = {}, doc = {}, options = {}) {
-    return this.Schema.updateMany(filter, doc, options);
+  updateMany(query = {}, update = {}) {
+    return this.Schema.updateMany(query, update);
   }
 }
 

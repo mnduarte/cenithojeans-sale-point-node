@@ -33,7 +33,16 @@ const calculateTotalPercentage = (percentageToDisccountOrAdd) => {
     : 1.0 + percentageToDisccountOrAdd / 100;
 };
 
+function formatCheckoutDate(checkoutDate) {
+  const date = new Date(checkoutDate);
+  const day = (date.getDate() + 1).toString().padStart(2, "0"); // Agrega cero adelante si es menor a 10
+  const month = (date.getMonth() + 1).toString().padStart(2, "0"); // Agrega cero adelante si es menor a 10
+  const formattedDate = `${day}/${month}/${date.getFullYear()}`;
+  return formattedDate;
+}
+
 module.exports = {
   formatCurrency,
   calculateTotalPercentage,
+  formatCheckoutDate,
 };

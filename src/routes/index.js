@@ -5,6 +5,7 @@ const priceRoutes = require("./price.route");
 const employeeRoutes = require("./employee.route");
 const storeRoutes = require("./store.route");
 const saleRoutes = require("./sale.route");
+const cashflowRoutes = require("./cashflow.route");
 /*
 // Función para agregar retraso
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -21,5 +22,6 @@ router.use("/price", priceRoutes);
 router.use("/employee", employeeRoutes);
 router.use("/store", storeRoutes);
 router.use("/sale", saleRoutes);
+router.use("/cashflow", cashflowRoutes);
 
 module.exports = router;

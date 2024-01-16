@@ -24,6 +24,12 @@ const SaleSchema = mongoose.Schema(
     typeShipment: {
       type: String,
     },
+    transfer: {
+      type: Number,
+    },
+    cash: {
+      type: Number,
+    },
     items: {
       type: Number,
     },
@@ -44,6 +50,12 @@ const SaleSchema = mongoose.Schema(
     },
     total: {
       type: Number,
+    },
+    checkoutDate: {
+      type: Date,
+    },
+    cancelled: {
+      type: Boolean,
     },
   },
   {

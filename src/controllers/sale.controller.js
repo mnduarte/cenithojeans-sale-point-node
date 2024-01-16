@@ -4,6 +4,7 @@ const BaseModel = require("../models/base.model");
 const {
   formatCurrency,
   calculateTotalPercentage,
+  formatCheckoutDate,
 } = require("../utils/formatUtils");
 const Sale = new BaseModel("Sale");
 
@@ -51,7 +52,74 @@ Controllers.getSales = async (req, res) => {
           subTotalDevolutionItems: 1,
           percentageToDisccountOrAdd: 1,
           username: 1,
+          cancelled: 1,
           total: 1,
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+          _id: 0,
+        },
+      },
+    ]);
+
+    res.send({ results: sales });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error al buscar sales" });
+  }
+};
+
+Controllers.getOrders = async (req, res) => {
+  try {
+    const { startDate, endDate, typeSale, store, employee } = req.query;
+
+    const addOneDayDate = new Date(
+      new Date(endDate).setDate(new Date(endDate).getDate() + 1)
+    );
+
+    const query = {
+      createdAt: {
+        $gte: new Date(startDate),
+        $lt: addOneDayDate,
+      },
+    };
+
+    // Agregar store a la consulta si está presente
+    if (store) {
+      query.store = store;
+    }
+
+    // Agregar employee a la consulta si está presente
+    if (employee) {
+      query.employee = employee;
+    }
+
+    query.typeSale = typeSale;
+
+    const sales = await Sale.aggregate([
+      { $match: query },
+      {
+        $project: {
+          id: "$_id",
+          store: 1,
+          order: 1,
+          employee: 1,
+          typeShipment: 1,
+          transfer: 1,
+          cash: 1,
+          items: 1,
+          username: 1,
+          total: 1,
+          cancelled: 1,
+          checkoutDate: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$checkoutDate",
+            },
+          },
           date: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -130,10 +198,88 @@ Controllers.create = async (req, res) => {
   }
 };
 
+Controllers.update = async (req, res) => {
+  try {
+    const { id, dataIndex, value } = req.body;
+    const updatedPrice = await Sale.findByIdAndUpdate(
+      { _id: id },
+      { [dataIndex]: value }
+    );
+
+    console.log(updatedPrice.checkoutDate);
+
+    const transformedResults = {
+      ...updatedPrice._doc,
+      id: updatedPrice._id,
+    };
+
+    if (updatedPrice.checkoutDate) {
+      transformedResults.checkoutDate = formatCheckoutDate(
+        updatedPrice.checkoutDate
+      );
+    }
+
+    res.send({
+      results: transformedResults,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error al modificar precio" });
+  }
+};
+
+Controllers.cancelOrders = async (req, res) => {
+  try {
+    const { itemsIdSelected } = req.body;
+    const idsToUpdate = itemsIdSelected.map(({ id }) => id);
+
+    await Sale.updateMany(
+      { _id: { $in: idsToUpdate } },
+      { $set: { cancelled: true } }
+    );
+
+    const ordersCancelled = await Sale.aggregate([
+      { $match: { _id: { $in: idsToUpdate } } },
+      {
+        $project: {
+          id: "$_id",
+          store: 1,
+          order: 1,
+          employee: 1,
+          typeShipment: 1,
+          transfer: 1,
+          cash: 1,
+          items: 1,
+          username: 1,
+          total: 1,
+          cancelled: 1,
+          checkoutDate: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$checkoutDate",
+            },
+          },
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+          _id: 0,
+        },
+      },
+    ]);
+
+    res.send({ results: ordersCancelled });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error when creating the Sale" });
+  }
+};
+
 const mappingPriceWithConcept = {
   bolsas: "Bolsas",
   envio: "Envio",
-  recargoPorMenor: "Recargo Por Menor",
+  recargoPorMenor: "Recargo",
 };
 
 const templateRecieve = async ({
@@ -209,7 +355,7 @@ const templateRecieve = async ({
 
   const numOrderLocalOrPedido = typeSale === "local" ? numOrderLocal : numOrder;
 
-  let tpl = `Cenitho Jeans - ${formattedDateTime}\n
+  let tpl = `Cenitho Jeans - ${formattedDateTime}\n\n
 Bogota 3419  (011) 2080-1916
 Helguera 569 (011) 2091-3841
 www.cenitho.com\n`;
@@ -276,6 +422,7 @@ www.cenitho.com\n`;
     `
     \nLos cambios pueden realizarse dentro 
 de los 20 dias presentando este ticket
+\nMuchas Gracias por su Compra!
 \nTicket no valido como factura`;
 
   return tpl;
