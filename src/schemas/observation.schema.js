@@ -4,21 +4,15 @@ const { autoIncrement } = require("mongoose-plugin-autoinc");
 const Autopopulate = require("mongoose-autopopulate");
 const _ = require("lodash");
 
-const CashflowSchema = mongoose.Schema(
+const ObservationSchema = mongoose.Schema(
   {
-    type: {
-      type: String,
-    },
-    amount: {
-      type: Number,
-    },
-    employee: {
+    observation: {
       type: String,
     },
     store: {
       type: String,
     },
-    description: {
+    store: {
       type: String,
     },
   },
@@ -34,16 +28,16 @@ const CashflowSchema = mongoose.Schema(
  * Instance method to expose to the LatBoard API only the related fields.
  */
 
-CashflowSchema.methods.toJSON = function () {
+ObservationSchema.methods.toJSON = function () {
   const obj = this.toObject();
 
   return _.omit(obj, ["__v"]);
 };
 
-CashflowSchema.plugin(autoIncrement, {
-  model: "Cashflow",
+ObservationSchema.plugin(autoIncrement, {
+  model: "Observation",
   startAt: 1,
 });
-CashflowSchema.plugin(Autopopulate);
+ObservationSchema.plugin(Autopopulate);
 
-module.exports = mongoose.model("Cashflow", CashflowSchema);
+module.exports = mongoose.model("Observation", ObservationSchema);

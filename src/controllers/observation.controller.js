@@ -1,29 +1,27 @@
 // @Vendors
 const Controllers = {};
 const BaseModel = require("../models/base.model");
-const Cashflow = new BaseModel("Cashflow");
+const Observation = new BaseModel("Observation");
 // @Services
 
 Controllers.create = async (req, res) => {
   try {
-    const { type, amount, employee, store, description } = req.body;
+    const { observation, store, username } = req.body;
 
-    const newCashFlow = await Cashflow.create({
-      type,
-      amount,
-      employee,
+    const newObservation = await Observation.create({
+      observation,
       store,
-      description,
+      username,
     });
 
     res.send({
-      results: newCashFlow,
+      results: newObservation,
     });
   } catch (error) {
     res.status(500).json({ message: "Error al crear precio" });
   }
 };
-
+/*
 Controllers.getCashflowByDay = async (req, res) => {
   try {
     const { date, store } = req.query;
@@ -74,7 +72,7 @@ Controllers.getCashflowByDay = async (req, res) => {
     console.log(error);
     res.status(500).json({ message: "Error al buscar sales" });
   }
-};
+};*/
 
 module.exports = {
   Controllers,

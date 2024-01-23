@@ -74,7 +74,8 @@ Controllers.getSales = async (req, res) => {
 
 Controllers.getOrders = async (req, res) => {
   try {
-    const { startDate, endDate, typeSale, store, employee } = req.query;
+    const { startDate, endDate, typeSale, store, employee, typeShipment } =
+      req.query;
 
     const addOneDayDate = new Date(
       new Date(endDate).setDate(new Date(endDate).getDate() + 1)
@@ -95,6 +96,10 @@ Controllers.getOrders = async (req, res) => {
     // Agregar employee a la consulta si está presente
     if (employee) {
       query.employee = employee;
+    }
+
+    if (typeShipment) {
+      query.typeShipment = typeShipment;
     }
 
     query.typeSale = typeSale;
@@ -138,6 +143,60 @@ Controllers.getOrders = async (req, res) => {
   }
 };
 
+Controllers.getSalesByEmployees = async (req, res) => {
+  try {
+    const { date, store } = req.query;
+
+    const addOneDayDate = new Date(
+      new Date(date).setDate(new Date(date).getDate() + 1)
+    );
+
+    const query = {
+      createdAt: {
+        $gte: new Date(date),
+        $lt: addOneDayDate,
+      },
+    };
+
+    if (store !== "ALL") {
+      query.store = store;
+    }
+
+    query.typeSale = "local";
+
+    query.$or = [{ cancelled: false }, { cancelled: { $exists: false } }];
+
+    const sales = await Sale.aggregate([
+      { $match: query },
+      {
+        $project: {
+          id: "$_id",
+          order: 1,
+          employee: 1,
+          username: 1,
+          items: 1,
+          total: 1,
+          cancelled: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    const getSalesByEmployees = {};
+
+    sales.forEach((sale) => {
+      getSalesByEmployees[sale.employee]
+        ? getSalesByEmployees[sale.employee].push(sale)
+        : (getSalesByEmployees[sale.employee] = [sale]);
+    });
+
+    res.send({ results: getSalesByEmployees });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error al buscar sales" });
+  }
+};
+
 Controllers.create = async (req, res) => {
   try {
     const {
@@ -156,11 +215,10 @@ Controllers.create = async (req, res) => {
       total,
     } = req.body;
 
-    const now = new Date();
-    now.setHours(now.getHours() - 3);
-
     const lastSaleByEmployee = await Sale.findOne({
       employee,
+      typeSale: "local",
+      $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
     })
       .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
       .limit(1);
@@ -173,6 +231,9 @@ Controllers.create = async (req, res) => {
     const numOrderLocalOrPedido =
       typeSale === "local" ? numOrderLocal : numOrder;
 
+    const totalCalculated =
+      Number(total) * calculateTotalPercentage(percentageToDisccountOrAdd);
+
     await Sale.create({
       store,
       order: numOrderLocalOrPedido,
@@ -181,14 +242,20 @@ Controllers.create = async (req, res) => {
       typePayment,
       typeShipment,
       items,
+      transfer:
+        typeSale === "pedido" && typePayment === "transferencia"
+          ? totalCalculated
+          : "",
+      cash:
+        typeSale === "pedido" && typePayment === "efectivo"
+          ? totalCalculated
+          : "",
       subTotalItems,
       devolutionItems,
       subTotalDevolutionItems,
       percentageToDisccountOrAdd,
       username,
-      total:
-        Number(total) * calculateTotalPercentage(percentageToDisccountOrAdd),
-      createdAt: now,
+      total: totalCalculated,
     });
 
     res.send({ results: "¡Éxito! Se agrego al listado de ventas.!" });
@@ -198,15 +265,54 @@ Controllers.create = async (req, res) => {
   }
 };
 
-Controllers.update = async (req, res) => {
+Controllers.createSaleByEmployee = async (req, res) => {
+  try {
+    const { items, total, employee, store, username } = req.body;
+
+    const lastSaleByEmployee = await Sale.findOne({
+      employee,
+      typeSale: "local",
+      $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+    })
+      .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
+      .limit(1);
+
+    const numOrderLocal =
+      !lastSaleByEmployee || lastSaleByEmployee.order >= 100
+        ? 1
+        : lastSaleByEmployee.order + 1;
+
+    const newSaleByEmployee = await Sale.create({
+      items,
+      total,
+      typeSale: "local",
+      order: numOrderLocal,
+      employee,
+      store,
+      username,
+    });
+
+    const transformedResults = {
+      ...newSaleByEmployee._doc,
+      id: newSaleByEmployee._id,
+    };
+
+    res.send({
+      results: transformedResults,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error al modificar orden" });
+  }
+};
+
+Controllers.updateOrder = async (req, res) => {
   try {
     const { id, dataIndex, value } = req.body;
     const updatedPrice = await Sale.findByIdAndUpdate(
       { _id: id },
       { [dataIndex]: value }
     );
-
-    console.log(updatedPrice.checkoutDate);
 
     const transformedResults = {
       ...updatedPrice._doc,
@@ -223,7 +329,34 @@ Controllers.update = async (req, res) => {
       results: transformedResults,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error al modificar precio" });
+    res.status(500).json({ message: "Error al modificar orden" });
+  }
+};
+
+Controllers.updateSaleByEmployee = async (req, res) => {
+  try {
+    const { id, dataIndex, value } = req.body;
+    const updatedPrice = await Sale.findByIdAndUpdate(
+      { _id: id },
+      { [dataIndex]: value }
+    );
+
+    const transformedResults = {
+      ...updatedPrice._doc,
+      id: updatedPrice._id,
+    };
+
+    if (updatedPrice.checkoutDate) {
+      transformedResults.checkoutDate = formatCheckoutDate(
+        updatedPrice.checkoutDate
+      );
+    }
+
+    res.send({
+      results: transformedResults,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error al modificar orden" });
   }
 };
 
@@ -280,6 +413,8 @@ const mappingPriceWithConcept = {
   bolsas: "Bolsas",
   envio: "Envio",
   recargoPorMenor: "Recargo",
+  pagoEfectivo: "Pago efectivo",
+  pagoTransferencia: "Pago transferencia",
 };
 
 const templateRecieve = async ({
@@ -292,6 +427,7 @@ const templateRecieve = async ({
   numOrder,
   employee,
   pricesWithconcepts,
+  pricesDevolutionWithconcepts,
   totalPrice,
 }) => {
   const alignRight = (text, width) => {
@@ -317,7 +453,7 @@ const templateRecieve = async ({
         (item) =>
           `  ${mappingPriceWithConcept[item.concept]}: ${alignRight(
             item.quantity.toString(),
-            18 - mappingPriceWithConcept[item.concept].length
+            20 - mappingPriceWithConcept[item.concept].length
           )} x ${formatCurrency(item.price)} | ${formatCurrency(
             item.quantity * item.price
           )}`
@@ -344,6 +480,8 @@ const templateRecieve = async ({
 
   const lastSaleByEmployee = await Sale.findOne({
     employee,
+    typeSale: "local",
+    $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
   })
     .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
     .limit(1);
@@ -393,6 +531,13 @@ www.cenitho.com\n`;
     \n${pricesWithToString(pricesWithconcepts)}`;
   }
 
+  if (pricesDevolutionWithconcepts.length) {
+    tpl =
+      tpl +
+      `
+    \n${pricesWithToString(pricesDevolutionWithconcepts)}`;
+  }
+
   tpl =
     tpl +
     `
@@ -440,6 +585,7 @@ Controllers.print = async (req, res) => {
       typeSale,
       numOrder,
       pricesWithconcepts,
+      pricesDevolutionWithconcepts,
       totalPrice,
     } = req.body;
 
@@ -453,6 +599,7 @@ Controllers.print = async (req, res) => {
       typeSale,
       numOrder,
       pricesWithconcepts,
+      pricesDevolutionWithconcepts,
       totalPrice,
     });
 

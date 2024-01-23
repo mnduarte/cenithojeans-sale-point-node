@@ -8,6 +8,7 @@ const schemas = {
   Price: require("../schemas/price.schema"),
   Store: require("../schemas/store.schema"),
   Cashflow: require("../schemas/cashflow.schema"),
+  Observation: require("../schemas/observation.schema"),
   UpdateDB: require("../schemas/update-db.schema"),
 };
 
@@ -35,7 +36,13 @@ class BaseModel {
    * @param {Function} next
    */
   async create(data) {
+    const now = new Date();
+    now.setHours(now.getHours() - 3);
+
+    data.createdAt = now;
+
     const cleanedData = sanitize(data);
+
     const doc = new this.Schema(cleanedData);
 
     await doc.save();
@@ -69,8 +76,7 @@ class BaseModel {
     query = {},
     { orderBy = "-createdAt", projection, mustSanitize = true } = {}
   ) {
-    const cleanedQuery = mustSanitize ? sanitize(query) : query;
-    return this.Schema.findOne(cleanedQuery, projection).sort(orderBy);
+    return this.Schema.findOne(query, projection).sort(orderBy);
   }
 
   /**
