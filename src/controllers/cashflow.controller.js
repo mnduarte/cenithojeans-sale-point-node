@@ -76,6 +76,46 @@ Controllers.getCashflowByDay = async (req, res) => {
   }
 };
 
+Controllers.getOutgoingsByDay = async (req, res) => {
+  try {
+    const { date, store } = req.query;
+
+    const addOneDayDate = new Date(
+      new Date(date).setDate(new Date(date).getDate() + 1)
+    );
+
+    const query = {
+      createdAt: {
+        $gte: new Date(date),
+        $lt: addOneDayDate,
+      },
+    };
+
+    query.store = store;
+    query.type === "egreso";
+
+    const outgoings = await Cashflow.aggregate([
+      { $match: query },
+      {
+        $project: {
+          id: "$_id",
+          type: 1,
+          amount: 1,
+          employee: 1,
+          store: 1,
+          description: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    res.send({ results: outgoings });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error al buscar sales" });
+  }
+};
+
 module.exports = {
   Controllers,
 };

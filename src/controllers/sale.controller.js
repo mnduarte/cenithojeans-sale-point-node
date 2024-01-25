@@ -717,6 +717,7 @@ const mappingPriceWithConcept = {
   recargoPorMenor: "Recargo",
   pagoEfectivo: "Pago efectivo",
   pagoTransferencia: "Pago transferencia",
+  descuento: "Descuento",
 };
 
 const templateRecieve = async ({
@@ -819,19 +820,25 @@ www.cenitho.com\n`;
     0
   )}`;
 
+  if (pricesWithconcepts.length) {
+    tpl =
+      tpl +
+      `
+    \n${pricesWithToString(pricesWithconcepts)}`;
+  }
+
+  tpl =
+    tpl +
+    `
+
+Total: ${alignRight(formatCurrency(totalPrices), 28)}`;
+
   if (devolutionPricesSelected.length) {
     tpl =
       tpl +
       `
 
   Devoluciones:\n${pricesToString(devolutionPricesSelected)}`;
-  }
-
-  if (pricesWithconcepts.length) {
-    tpl =
-      tpl +
-      `
-    \n${pricesWithToString(pricesWithconcepts)}`;
   }
 
   if (pricesDevolutionWithconcepts.length) {
@@ -841,18 +848,12 @@ www.cenitho.com\n`;
     \n${pricesWithToString(pricesDevolutionWithconcepts)}`;
   }
 
-  tpl =
-    tpl +
-    `
-
-  Total: ${alignRight(formatCurrency(totalPrices), 28)}`;
-
   if (totalDevolutionPrices !== 0) {
     tpl =
       tpl +
       `
 
-  Total Devoluciones: ${alignRight(formatCurrency(totalDevolutionPrices), 14)}`;
+Total Devoluciones: ${alignRight(formatCurrency(totalDevolutionPrices), 14)}`;
   }
 
   if (percentageToDisccountOrAdd !== 0) {
