@@ -58,6 +58,21 @@ Controllers.create = async (req, res) => {
   }
 };
 
+Controllers.addNewNumOrder = async (req, res) => {
+  try {
+    const { employeeId, newNumOrder } = req.body;
+
+    await Employee.findByIdAndUpdate(
+      { _id: employeeId },
+      { newNumOrder, enableNewNumOrder: true }
+    );
+
+    res.send({ results: "Se estableció N Orden" });
+  } catch (error) {
+    res.status(500).json({ message: "Error al crear precio" });
+  }
+};
+
 Controllers.update = async (req, res) => {
   try {
     const { id, name, store, active } = req.body;

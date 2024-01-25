@@ -7,6 +7,8 @@ const {
   formatCheckoutDate,
 } = require("../utils/formatUtils");
 const Sale = new BaseModel("Sale");
+const Employee = new BaseModel("Employee");
+const Cashflow = new BaseModel("Cashflow");
 
 const printer = require("@woovi/node-printer");
 
@@ -197,6 +199,277 @@ Controllers.getSalesByEmployees = async (req, res) => {
   }
 };
 
+Controllers.getReports = async (req, res) => {
+  try {
+    const { month, year, store, typeSale } = req.query;
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const firstDayOfNextMonth = new Date(year, month + 1, 1);
+
+    const query = {
+      createdAt: {
+        $gte: firstDayOfMonth,
+        $lt: firstDayOfNextMonth,
+      },
+    };
+
+    query.store = store;
+    query.typeSale = typeSale;
+
+    query.$or = [{ cancelled: false }, { cancelled: { $exists: false } }];
+
+    const salesByDays = await Sale.aggregate([
+      { $match: query },
+      {
+        $project: {
+          id: "$_id",
+          order: 1,
+          employee: 1,
+          cash: "$cash",
+          transfer: "$transfer",
+          items: 1,
+          total: 1,
+          _id: 0,
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+          week: { $isoWeek: "$createdAt" },
+        },
+      },
+      {
+        $group: {
+          _id: { week: "$week", date: "$date" },
+          items: { $sum: "$items" },
+          cash: { $sum: "$cash" },
+          transfer: { $sum: "$transfer" },
+          total: { $sum: "$total" },
+        },
+      },
+      {
+        $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
+      },
+      {
+        $group: {
+          _id: "$_id.week",
+          salesGeneral: {
+            $push: {
+              date: "$_id.date",
+              items: "$items",
+              cash: "$cash",
+              transfer: "$transfer",
+              total: "$total",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          week: "$_id",
+          salesGeneral: 1,
+        },
+      },
+      {
+        $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
+      },
+    ]);
+
+    const salesByEmployees = await Sale.aggregate([
+      { $match: query },
+      {
+        $project: {
+          id: "$_id",
+          order: 1,
+          employee: 1,
+          cash: 1,
+          transfer: 1,
+          items: 1,
+          total: 1,
+          _id: 0,
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+          week: { $isoWeek: "$createdAt" },
+        },
+      },
+      {
+        $group: {
+          _id: { week: "$week", date: "$date", employee: "$employee" },
+          items: { $sum: "$items" },
+          cash: { $sum: "$cash" },
+          transfer: { $sum: "$transfer" },
+          total: { $sum: "$total" },
+        },
+      },
+      {
+        $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
+      },
+      {
+        $group: {
+          _id: { week: "$_id.week", employee: "$_id.employee" },
+          days: {
+            $push: {
+              date: "$_id.date",
+              items: "$items",
+              cash: "$cash",
+              transfer: "$transfer",
+              total: "$total",
+            },
+          },
+        },
+      },
+      {
+        $sort: { "_id.employee": 1 }, // Ordenar por empleado ascendente
+      },
+      {
+        $group: {
+          _id: "$_id.week",
+          employees: {
+            $push: {
+              employee: "$_id.employee",
+              days: "$days",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          week: "$_id",
+          employees: 1,
+          _id: 0,
+        },
+      },
+      {
+        $sort: { week: 1 },
+      },
+    ]);
+
+    const queryCashflow = {
+      createdAt: {
+        $gte: firstDayOfMonth,
+        $lt: firstDayOfNextMonth,
+      },
+    };
+
+    queryCashflow.store = store;
+    queryCashflow.type = "egreso";
+
+    const cashflows = await Cashflow.aggregate([
+      { $match: queryCashflow },
+      {
+        $project: {
+          id: "$_id",
+          type: 1,
+          amount: 1,
+          store: 1,
+          _id: 0,
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+          week: { $isoWeek: "$createdAt" },
+        },
+      },
+      {
+        $group: {
+          _id: { week: "$week", date: "$date" },
+          amount: { $sum: "$amount" },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.week",
+          days: {
+            $push: {
+              date: "$_id.date",
+              amount: "$amount",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          week: "$_id",
+          days: 1,
+        },
+      },
+      {
+        $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
+      },
+    ]);
+
+    const weekWithDays = {};
+
+    salesByDays.forEach((resumeWeek) => {
+      weekWithDays[resumeWeek.week] = resumeWeek.salesGeneral.map(
+        ({ date }) => date
+      );
+    });
+
+    const salesGeneral = salesByDays.map((resumeWeek) => {
+      const weekSalesByEmployees = salesByEmployees.find(
+        ({ week }) => week === resumeWeek.week
+      );
+
+      resumeWeek.salesByEmployees = weekSalesByEmployees.employees.map(
+        (saleByEmployee) => {
+          return {
+            employee: saleByEmployee.employee,
+            sales: weekWithDays[resumeWeek.week].map((day) => {
+              const foundSale = saleByEmployee.days.find((s) => s.date === day);
+
+              return (
+                foundSale || {
+                  date: day,
+                  items: 0,
+                  cash: 0,
+                  transfer: 0,
+                  total: 0,
+                }
+              );
+            }),
+          };
+        }
+      );
+
+      const cashflowByWeek = cashflows.find(
+        (cashflow) => cashflow.week === resumeWeek.week
+      );
+
+      resumeWeek.salesGeneral.map((sale) => {
+        sale.totalBox = sale.total;
+        if (cashflowByWeek) {
+          const cashflowByDay = cashflowByWeek.days.find(
+            (cashflow) => cashflow.date === sale.date
+          );
+          if (cashflowByDay) {
+            sale.outgoings = cashflowByDay.amount;
+            sale.totalBox = sale.total - cashflowByDay.amount;
+          }
+        }
+
+        return sale;
+      });
+
+      return resumeWeek;
+    });
+
+    res.send({
+      results: { salesGeneral, typeSale },
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error al buscar sales" });
+  }
+};
+
 Controllers.create = async (req, res) => {
   try {
     const {
@@ -215,24 +488,36 @@ Controllers.create = async (req, res) => {
       total,
     } = req.body;
 
-    const lastSaleByEmployee = await Sale.findOne({
-      employee,
-      typeSale: "local",
-      $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
-    })
-      .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
-      .limit(1);
+    let numOrderLocalOrPedido;
 
-    const numOrderLocal =
-      !lastSaleByEmployee || lastSaleByEmployee.order >= 100
+    if (typeSale === "local") {
+      const lastSaleByEmployee = await Sale.findOne({
+        employee,
+        typeSale: "local",
+        $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+      })
+        .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
+        .limit(1);
+
+      const findEmployee = await Employee.findOne({
+        name: employee,
+      });
+
+      numOrderLocalOrPedido = findEmployee.enableNewNumOrder
+        ? findEmployee.newNumOrder
+        : !lastSaleByEmployee || lastSaleByEmployee.order >= 100
         ? 1
         : lastSaleByEmployee.order + 1;
 
-    const numOrderLocalOrPedido =
-      typeSale === "local" ? numOrderLocal : numOrder;
+      if (findEmployee.enableNewNumOrder) {
+        findEmployee.enableNewNumOrder = false;
+        await findEmployee.save();
+      }
+    }
 
-    const totalCalculated =
-      Number(total) * calculateTotalPercentage(percentageToDisccountOrAdd);
+    if (typeSale === "pedido") {
+      numOrderLocalOrPedido = numOrder;
+    }
 
     await Sale.create({
       store,
@@ -243,19 +528,14 @@ Controllers.create = async (req, res) => {
       typeShipment,
       items,
       transfer:
-        typeSale === "pedido" && typePayment === "transferencia"
-          ? totalCalculated
-          : "",
-      cash:
-        typeSale === "pedido" && typePayment === "efectivo"
-          ? totalCalculated
-          : "",
+        typeSale === "pedido" && typePayment === "transferencia" ? total : "",
+      cash: typeSale === "pedido" && typePayment === "efectivo" ? total : "",
       subTotalItems,
       devolutionItems,
       subTotalDevolutionItems,
       percentageToDisccountOrAdd,
       username,
-      total: totalCalculated,
+      total: total,
     });
 
     res.send({ results: "¡Éxito! Se agrego al listado de ventas.!" });
@@ -277,10 +557,20 @@ Controllers.createSaleByEmployee = async (req, res) => {
       .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
       .limit(1);
 
-    const numOrderLocal =
-      !lastSaleByEmployee || lastSaleByEmployee.order >= 100
-        ? 1
-        : lastSaleByEmployee.order + 1;
+    const findEmployee = await Employee.findOne({
+      name: employee,
+    });
+
+    const numOrderLocal = findEmployee.enableNewNumOrder
+      ? findEmployee.newNumOrder
+      : !lastSaleByEmployee || lastSaleByEmployee.order >= 100
+      ? 1
+      : lastSaleByEmployee.order + 1;
+
+    if (findEmployee.enableNewNumOrder) {
+      findEmployee.enableNewNumOrder = false;
+      await findEmployee.save();
+    }
 
     const newSaleByEmployee = await Sale.create({
       items,
@@ -309,19 +599,31 @@ Controllers.createSaleByEmployee = async (req, res) => {
 Controllers.updateOrder = async (req, res) => {
   try {
     const { id, dataIndex, value } = req.body;
-    const updatedPrice = await Sale.findByIdAndUpdate(
-      { _id: id },
-      { [dataIndex]: value }
-    );
+
+    const saleToUpdate = await Sale.findOne({
+      _id: id,
+    });
+
+    saleToUpdate[dataIndex] = value;
+
+    if (dataIndex === "cash") {
+      saleToUpdate.total = saleToUpdate.transfer + value;
+    }
+
+    if (dataIndex === "transfer") {
+      saleToUpdate.total = saleToUpdate.cash + value;
+    }
+
+    await saleToUpdate.save();
 
     const transformedResults = {
-      ...updatedPrice._doc,
-      id: updatedPrice._id,
+      ...saleToUpdate._doc,
+      id: saleToUpdate._id,
     };
 
-    if (updatedPrice.checkoutDate) {
+    if (saleToUpdate.checkoutDate) {
       transformedResults.checkoutDate = formatCheckoutDate(
-        updatedPrice.checkoutDate
+        saleToUpdate.checkoutDate
       );
     }
 
@@ -425,10 +727,11 @@ const templateRecieve = async ({
   seller,
   typeSale,
   numOrder,
-  employee,
   pricesWithconcepts,
   pricesDevolutionWithconcepts,
-  totalPrice,
+  totalPrices,
+  totalDevolutionPrices,
+  total,
 }) => {
   const alignRight = (text, width) => {
     const spaces = width - text.length;
@@ -474,12 +777,12 @@ const templateRecieve = async ({
   const multiplyBy = percentageToDisccountOrAdd < 0 ? 1 : -1;
   const calculateTotalDiscount =
     multiplyBy *
-    (totalPrice -
-      totalPrice *
+    (totalPrices -
+      totalPrices *
         calculateTotalPercentage(Math.abs(percentageToDisccountOrAdd)));
 
   const lastSaleByEmployee = await Sale.findOne({
-    employee,
+    seller,
     typeSale: "local",
     $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
   })
@@ -542,7 +845,15 @@ www.cenitho.com\n`;
     tpl +
     `
 
-  Total: ${alignRight(formatCurrency(totalPrice), 28)}`;
+  Total: ${alignRight(formatCurrency(totalPrices), 28)}`;
+
+  if (totalDevolutionPrices !== 0) {
+    tpl =
+      tpl +
+      `
+
+  Total Devoluciones: ${alignRight(formatCurrency(totalDevolutionPrices), 14)}`;
+  }
 
   if (percentageToDisccountOrAdd !== 0) {
     tpl =
@@ -551,16 +862,15 @@ www.cenitho.com\n`;
 
   ${titleTotal}      ${percentageToDisccountOrAdd}% | ${formatCurrency(
         calculateTotalDiscount
-      )}
-      
-  Total: ${alignRight(
-    formatCurrency(
-      totalPrice * calculateTotalPercentage(percentageToDisccountOrAdd)
-    ),
-    28
-  )}
-      `;
+      )}`;
   }
+
+  tpl =
+    tpl +
+    `
+  
+Total Final: ${alignRight(formatCurrency(total), 24)}
+  `;
 
   tpl =
     tpl +
@@ -581,12 +891,13 @@ Controllers.print = async (req, res) => {
       percentageToDisccountOrAdd,
       username,
       seller,
-      employee,
       typeSale,
       numOrder,
       pricesWithconcepts,
       pricesDevolutionWithconcepts,
-      totalPrice,
+      totalPrices,
+      totalDevolutionPrices,
+      total,
     } = req.body;
 
     const tpl = await templateRecieve({
@@ -595,12 +906,13 @@ Controllers.print = async (req, res) => {
       percentageToDisccountOrAdd,
       username,
       seller,
-      employee,
       typeSale,
       numOrder,
       pricesWithconcepts,
       pricesDevolutionWithconcepts,
-      totalPrice,
+      totalPrices,
+      totalDevolutionPrices,
+      total,
     });
 
     const formattedData = `${tpl}\n\n\n\n`;

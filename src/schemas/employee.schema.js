@@ -12,6 +12,12 @@ const EmployeeSchema = mongoose.Schema(
     store: {
       type: String,
     },
+    newNumOrder: {
+      type: String,
+    },
+    enableNewNumOrder: {
+      type: Boolean,
+    },
     active: {
       type: Boolean,
     },
