@@ -12,9 +12,6 @@ const ObservationSchema = mongoose.Schema(
     store: {
       type: String,
     },
-    store: {
-      type: String,
-    },
   },
   {
     timestamps: {

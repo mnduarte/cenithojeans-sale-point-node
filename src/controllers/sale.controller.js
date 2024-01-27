@@ -357,10 +357,9 @@ Controllers.getReports = async (req, res) => {
     };
 
     queryCashflow.store = store;
-    queryCashflow.type = "egreso";
 
-    const cashflows = await Cashflow.aggregate([
-      { $match: queryCashflow },
+    const cashflowsResumeOutgoings = await Cashflow.aggregate([
+      { $match: { ...queryCashflow, type: "egreso" } },
       {
         $project: {
           id: "$_id",
@@ -405,6 +404,121 @@ Controllers.getReports = async (req, res) => {
       },
     ]);
 
+    const cashflowsResumeIncomes = await Cashflow.aggregate([
+      { $match: { ...queryCashflow, type: "ingreso" } },
+      {
+        $project: {
+          id: "$_id",
+          type: 1,
+          amount: 1,
+          items: 1,
+          store: 1,
+          _id: 0,
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+          week: { $isoWeek: "$createdAt" },
+        },
+      },
+      {
+        $group: {
+          _id: { week: "$week", date: "$date" },
+          amount: { $sum: "$amount" },
+          items: { $sum: "$items" },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.week",
+          days: {
+            $push: {
+              date: "$_id.date",
+              amount: "$amount",
+              items: "$items",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          week: "$_id",
+          days: 1,
+        },
+      },
+      {
+        $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
+      },
+    ]);
+
+    const cashflowsResumeIncomesByEmployee = await Cashflow.aggregate([
+      { $match: { ...queryCashflow, type: "ingreso" } },
+      {
+        $project: {
+          id: "$_id",
+          employee: 1,
+          type: 1,
+          amount: 1,
+          items: 1,
+          store: 1,
+          _id: 0,
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+          week: { $isoWeek: "$createdAt" },
+        },
+      },
+      {
+        $group: {
+          _id: { week: "$week", date: "$date", employee: "$employee" },
+          amount: { $sum: "$amount" },
+          items: { $sum: "$items" },
+        },
+      },
+      {
+        $group: {
+          _id: { week: "$_id.week", employee: "$_id.employee" },
+          days: {
+            $push: {
+              date: "$_id.date",
+              amount: "$amount",
+              items: "$items",
+            },
+          },
+          totalAmount: { $sum: "$amount" },
+          totalItems: { $sum: "$items" },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id.week",
+          employees: {
+            $push: {
+              employee: "$_id.employee",
+              days: "$days",
+              totalAmount: "$totalAmount",
+              totalItems: "$totalItems",
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          week: "$_id",
+          employees: 1,
+          _id: 0,
+        },
+      },
+      {
+        $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
+      },
+    ]);
+
     const weekWithDays = {};
 
     salesByDays.forEach((resumeWeek) => {
@@ -425,6 +539,31 @@ Controllers.getReports = async (req, res) => {
             sales: weekWithDays[resumeWeek.week].map((day) => {
               const foundSale = saleByEmployee.days.find((s) => s.date === day);
 
+              const weekIncomesByEmployee =
+                cashflowsResumeIncomesByEmployee.find(
+                  (e) => e.week === resumeWeek.week
+                );
+
+              if (!!weekIncomesByEmployee && typeSale === "local") {
+                const foundEmployeeIncome =
+                  weekIncomesByEmployee.employees.find(
+                    (e) => e.employee === saleByEmployee.employee
+                  );
+
+                if (foundEmployeeIncome) {
+                  const foundDayIncomeByEmployee =
+                    foundEmployeeIncome.days.find((e) => e.date === day);
+
+                  if (foundDayIncomeByEmployee && foundSale) {
+                    foundSale.items =
+                      foundSale.items + (foundDayIncomeByEmployee.items || 0);
+
+                    foundSale.total =
+                      foundSale.total + foundDayIncomeByEmployee.amount;
+                  }
+                }
+              }
+
               return (
                 foundSale || {
                   date: day,
@@ -439,14 +578,29 @@ Controllers.getReports = async (req, res) => {
         }
       );
 
-      const cashflowByWeek = cashflows.find(
+      const cashflowByWeekOutgoing = cashflowsResumeOutgoings.find(
+        (cashflow) => cashflow.week === resumeWeek.week
+      );
+      const cashflowByWeekIncome = cashflowsResumeIncomes.find(
         (cashflow) => cashflow.week === resumeWeek.week
       );
 
       resumeWeek.salesGeneral.map((sale) => {
         sale.totalBox = sale.total;
-        if (cashflowByWeek) {
-          const cashflowByDay = cashflowByWeek.days.find(
+
+        if (cashflowByWeekIncome && typeSale === "local") {
+          const cashflowByDay = cashflowByWeekIncome.days.find(
+            (cashflow) => cashflow.date === sale.date
+          );
+
+          if (cashflowByDay) {
+            sale.items = sale.items + (cashflowByDay.items || 0);
+            sale.total = sale.total + cashflowByDay.amount;
+          }
+        }
+
+        if (cashflowByWeekOutgoing) {
+          const cashflowByDay = cashflowByWeekOutgoing.days.find(
             (cashflow) => cashflow.date === sale.date
           );
           if (cashflowByDay) {
@@ -462,7 +616,10 @@ Controllers.getReports = async (req, res) => {
     });
 
     res.send({
-      results: { salesGeneral, typeSale },
+      results: {
+        salesGeneral,
+        typeSale,
+      },
     });
   } catch (error) {
     console.log(error);

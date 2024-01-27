@@ -6,7 +6,7 @@ const Cashflow = new BaseModel("Cashflow");
 
 Controllers.create = async (req, res) => {
   try {
-    const { type, amount, employee, store, description } = req.body;
+    const { type, amount, employee, store, description, items } = req.body;
 
     const newCashFlow = await Cashflow.create({
       type,
@@ -14,6 +14,7 @@ Controllers.create = async (req, res) => {
       employee,
       store,
       description,
+      items,
     });
 
     res.send({
@@ -53,6 +54,7 @@ Controllers.getCashflowByDay = async (req, res) => {
           employee: 1,
           store: 1,
           description: 1,
+          items: 1,
           _id: 0,
         },
       },
@@ -92,7 +94,7 @@ Controllers.getOutgoingsByDay = async (req, res) => {
     };
 
     query.store = store;
-    query.type === "egreso";
+    query.type = "egreso";
 
     const outgoings = await Cashflow.aggregate([
       { $match: query },

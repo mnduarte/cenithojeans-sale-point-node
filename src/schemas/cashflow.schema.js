@@ -21,6 +21,9 @@ const CashflowSchema = mongoose.Schema(
     description: {
       type: String,
     },
+    items: {
+      type: Number,
+    },
   },
   {
     timestamps: {

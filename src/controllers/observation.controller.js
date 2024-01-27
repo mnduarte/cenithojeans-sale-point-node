@@ -21,58 +21,48 @@ Controllers.create = async (req, res) => {
     res.status(500).json({ message: "Error al crear precio" });
   }
 };
-/*
-Controllers.getCashflowByDay = async (req, res) => {
-  try {
-    const { date, store } = req.query;
 
-    const addOneDayDate = new Date(
-      new Date(date).setDate(new Date(date).getDate() + 1)
-    );
+Controllers.getObservations = async (req, res) => {
+  try {
+    const { month, year, store } = req.query;
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const firstDayOfNextMonth = new Date(year, month + 1, 1);
 
     const query = {
       createdAt: {
-        $gte: new Date(date),
-        $lt: addOneDayDate,
+        $gte: firstDayOfMonth,
+        $lt: firstDayOfNextMonth,
       },
     };
 
-    if (store !== "ALL") {
-      query.store = store;
-    }
+    query.store = store;
 
-    const cashflows = await Cashflow.aggregate([
+    const observations = await Observation.aggregate([
       { $match: query },
       {
         $project: {
           id: "$_id",
-          type: 1,
-          amount: 1,
-          employee: 1,
+          observation: 1,
           store: 1,
-          description: 1,
           _id: 0,
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
         },
       },
+      { $sort: { date: 1 } },
     ]);
 
-    const cashflowByType = {
-      incomes: [],
-      outgoings: [],
-    };
-
-    cashflows.forEach((cashflow) => {
-      cashflow.type === "ingreso"
-        ? cashflowByType.incomes.push(cashflow)
-        : cashflowByType.outgoings.push(cashflow);
-    });
-
-    res.send({ results: cashflowByType });
+    res.send({ results: observations });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar sales" });
   }
-};*/
+};
 
 module.exports = {
   Controllers,
