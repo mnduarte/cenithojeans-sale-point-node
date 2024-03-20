@@ -1019,7 +1019,6 @@ www.cenitho.com\n`;
   tpl =
     tpl +
     `
-
 Total: ${alignRight(formatCurrency(totalPrices), 28)}`;
 
   if (devolutionPricesSelected.length) {
@@ -1031,7 +1030,16 @@ Total: ${alignRight(formatCurrency(totalPrices), 28)}`;
   Total de prendas: ${devolutionPricesSelected.reduce(
     (acc, current) => acc + current.quantity,
     0
-  )}`;
+  )}
+Total: ${alignRight(
+        formatCurrency(
+          devolutionPricesSelected.reduce(
+            (acc, current) => current.price * current.quantity + acc,
+            0
+          )
+        ),
+        28
+      )}`;
   }
 
   if (pricesDevolutionWithconcepts.length) {
@@ -1046,7 +1054,7 @@ Total: ${alignRight(formatCurrency(totalPrices), 28)}`;
       tpl +
       `
 
-Total Devoluciones: ${alignRight(formatCurrency(totalDevolutionPrices), 15)}`;
+Total a descontar: ${alignRight(formatCurrency(totalDevolutionPrices), 15)}`;
   }
 
   if (percentageToDisccountOrAdd !== 0) {
