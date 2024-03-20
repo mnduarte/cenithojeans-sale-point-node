@@ -868,6 +868,35 @@ Controllers.cancelOrders = async (req, res) => {
   }
 };
 
+Controllers.getLastNumOrder = async (req, res) => {
+  try {
+    const { seller } = req.body;
+
+    const lastSaleByEmployee = await Sale.findOne({
+      employee: seller,
+      typeSale: "local",
+      $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+    })
+      .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
+      .limit(1);
+
+    const findEmployee = await Employee.findOne({
+      name: seller,
+    });
+
+    const lastNumOrder = findEmployee.enableNewNumOrder
+      ? findEmployee.newNumOrder
+      : !lastSaleByEmployee || lastSaleByEmployee.order >= 100
+      ? 1
+      : lastSaleByEmployee.order + 1;
+
+    res.send({ results: lastNumOrder });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error when creating the Sale" });
+  }
+};
+
 const mappingPriceWithConcept = {
   bolsas: "Bolsas",
   envio: "Envio",
@@ -933,10 +962,13 @@ const templateRecieve = async ({
   }/${now.getFullYear()} ${now.getHours()}:${now.getMinutes()}`;
 
   const multiplyBy = percentageToDisccountOrAdd < 0 ? 1 : -1;
+
+  const totalToPay = totalPrices - (totalDevolutionPrices || 0);
+
   const calculateTotalDiscount =
     multiplyBy *
-    (totalPrices -
-      totalPrices *
+    (totalToPay -
+      totalToPay *
         calculateTotalPercentage(Math.abs(percentageToDisccountOrAdd)));
 
   const lastSaleByEmployee = await Sale.findOne({
@@ -995,7 +1027,11 @@ Total: ${alignRight(formatCurrency(totalPrices), 28)}`;
       tpl +
       `
 
-  Devoluciones:\n${pricesToString(devolutionPricesSelected)}`;
+  Devoluciones:\n${pricesToString(devolutionPricesSelected)}
+  Total de prendas: ${devolutionPricesSelected.reduce(
+    (acc, current) => acc + current.quantity,
+    0
+  )}`;
   }
 
   if (pricesDevolutionWithconcepts.length) {
@@ -1010,15 +1046,15 @@ Total: ${alignRight(formatCurrency(totalPrices), 28)}`;
       tpl +
       `
 
-Total Devoluciones: ${alignRight(formatCurrency(totalDevolutionPrices), 14)}`;
+Total Devoluciones: ${alignRight(formatCurrency(totalDevolutionPrices), 15)}`;
   }
 
   if (percentageToDisccountOrAdd !== 0) {
     tpl =
       tpl +
       `
-
-  ${titleTotal}      ${percentageToDisccountOrAdd}% | ${formatCurrency(
+Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 20)}
+${titleTotal}      ${percentageToDisccountOrAdd}% | ${formatCurrency(
         calculateTotalDiscount
       )}`;
   }

@@ -9,6 +9,7 @@ router.get("/sales-by-employees", Controllers.getSalesByEmployees);
 router.put("/update-order", Controllers.updateOrder);
 router.put("/update-sale-by-employee", Controllers.updateSaleByEmployee);
 router.post("/cancel-order", Controllers.cancelOrders);
+router.post("/last-num-order-by-seller", Controllers.getLastNumOrder);
 router.post("/add-sale", Controllers.create);
 router.post("/add-sale-by-employee", Controllers.createSaleByEmployee);
 router.post("/print-sale", Controllers.print);
