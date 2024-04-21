@@ -45,7 +45,7 @@ Controllers.getCashflowByDay = async (req, res) => {
     }
 
     const cashflows = await Cashflow.aggregate([
-      { $match: query },
+      { $match: { ...query, cancelled: { $exists: false } } },
       {
         $project: {
           id: "$_id",
@@ -115,6 +115,71 @@ Controllers.getOutgoingsByDay = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar sales" });
+  }
+};
+
+Controllers.update = async (req, res) => {
+  try {
+    const { id, dataIndex, value } = req.body;
+    const updatedPrice = await Cashflow.findByIdAndUpdate(
+      { _id: id },
+      { [dataIndex]: value }
+    );
+
+    const transformedResults = {
+      ...updatedPrice._doc,
+      id: updatedPrice._id,
+    };
+
+    if (updatedPrice.checkoutDate) {
+      transformedResults.checkoutDate = formatCheckoutDate(
+        updatedPrice.checkoutDate
+      );
+    }
+
+    res.send({
+      results: transformedResults,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error al modificar orden" });
+  }
+};
+
+Controllers.remove = async (req, res) => {
+  try {
+    const { cashflowIds } = req.body;
+
+    let cashflowCancelled;
+
+    const chasflowsIdsToUpdate = cashflowIds.map(({ id }) => id);
+
+    await Cashflow.updateMany(
+      { _id: { $in: chasflowsIdsToUpdate } },
+      { $set: { cancelled: true } }
+    );
+
+    cashflowCancelled = await Cashflow.aggregate([
+      { $match: { _id: { $in: chasflowsIdsToUpdate } } },
+      {
+        $project: {
+          id: "$_id",
+          type: 1,
+          amount: 1,
+          employee: 1,
+          store: 1,
+          description: 1,
+          items: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    res.send({
+      results: cashflowCancelled,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error when creating the Sale" });
   }
 };
 

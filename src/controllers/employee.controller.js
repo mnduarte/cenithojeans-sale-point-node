@@ -17,6 +17,7 @@ const getAllEmployees = async (store = "ALL") => {
         name: 1,
         active: 1,
         store: 1,
+        position: 1,
         _id: 0,
       },
     },
@@ -40,12 +41,13 @@ Controllers.getAllByUser = async (req, res) => {
 
 Controllers.create = async (req, res) => {
   try {
-    const { name, store, active } = req.body;
+    const { name, store, position, active } = req.body;
 
     await Employee.create({
       name,
       store,
       active,
+      position,
     });
 
     const employee = await getAllEmployees();
@@ -75,10 +77,18 @@ Controllers.addNewNumOrder = async (req, res) => {
 
 Controllers.update = async (req, res) => {
   try {
-    const { id, name, store, active } = req.body;
+    const { id, name, store, position, active } = req.body;
+
+    const employees = await getAllEmployees();
+
+    await Employee.findOneAndUpdate(
+      { position },
+      { position: employees.length }
+    );
+
     const updatedEmployee = await Employee.findByIdAndUpdate(
       { _id: id },
-      { name, store, active }
+      { name, store, position, active }
     );
 
     if (updatedEmployee) {
@@ -91,6 +101,7 @@ Controllers.update = async (req, res) => {
       res.status(404).json({ message: "Employee not found" });
     }
   } catch (error) {
+    console.log(error.message);
     res.status(500).json({ message: "Error al modificar precio" });
   }
 };

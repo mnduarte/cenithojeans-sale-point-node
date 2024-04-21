@@ -24,6 +24,9 @@ const CashflowSchema = mongoose.Schema(
     items: {
       type: Number,
     },
+    cancelled: {
+      type: Boolean,
+    },
   },
   {
     timestamps: {

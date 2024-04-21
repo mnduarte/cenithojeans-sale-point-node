@@ -21,6 +21,9 @@ const EmployeeSchema = mongoose.Schema(
     active: {
       type: Boolean,
     },
+    position: {
+      type: Number,
+    },
   },
   {
     timestamps: {

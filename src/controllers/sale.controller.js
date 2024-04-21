@@ -12,6 +12,28 @@ const Cashflow = new BaseModel("Cashflow");
 
 const printer = require("@woovi/node-printer");
 
+const getAllEmployees = async (store = "ALL") => {
+  const filter = store === "ALL" ? {} : { store };
+
+  const employees = await Employee.aggregate([
+    {
+      $match: filter,
+    },
+    {
+      $project: {
+        id: "$_id",
+        name: 1,
+        active: 1,
+        store: 1,
+        position: 1,
+        _id: 0,
+      },
+    },
+  ]);
+
+  return employees;
+};
+
 Controllers.getSales = async (req, res) => {
   try {
     const { startDate, endDate, store, employee } = req.query;
@@ -76,8 +98,15 @@ Controllers.getSales = async (req, res) => {
 
 Controllers.getOrders = async (req, res) => {
   try {
-    const { startDate, endDate, typeSale, store, employee, typeShipment } =
-      req.query;
+    const {
+      startDate,
+      endDate,
+      typeSale,
+      store,
+      employee,
+      typeShipment,
+      checkoutDate,
+    } = req.query;
 
     const addOneDayDate = new Date(
       new Date(endDate).setDate(new Date(endDate).getDate() + 1)
@@ -90,12 +119,21 @@ Controllers.getOrders = async (req, res) => {
       },
     };
 
-    // Agregar store a la consulta si está presente
+    if (checkoutDate === "with") {
+      query.checkoutDate = { $exists: true, $ne: null };
+    }
+
+    if (checkoutDate === "wihtout") {
+      query.$or = [
+        { checkoutDate: { $exists: false } },
+        { checkoutDate: null },
+      ];
+    }
+
     if (store) {
       query.store = store;
     }
 
-    // Agregar employee a la consulta si está presente
     if (employee) {
       query.employee = employee;
     }
@@ -106,7 +144,7 @@ Controllers.getOrders = async (req, res) => {
 
     query.typeSale = typeSale;
 
-    const sales = await Sale.aggregate([
+    const orders = await Sale.aggregate([
       { $match: query },
       {
         $project: {
@@ -115,6 +153,7 @@ Controllers.getOrders = async (req, res) => {
           order: 1,
           employee: 1,
           typeShipment: 1,
+          lastTypePaymentUpdated: 1,
           transfer: 1,
           cash: 1,
           items: 1,
@@ -138,14 +177,14 @@ Controllers.getOrders = async (req, res) => {
       },
     ]);
 
-    res.send({ results: sales });
+    res.send({ results: orders });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: "Error al buscar sales" });
+    res.status(500).json({ message: "Error al buscar ordenes" });
   }
 };
 
-Controllers.getSalesByEmployees = async (req, res) => {
+Controllers.getSalesCashByEmployees = async (req, res) => {
   try {
     const { date, store } = req.query;
 
@@ -164,9 +203,29 @@ Controllers.getSalesByEmployees = async (req, res) => {
       query.store = store;
     }
 
-    query.typeSale = "local";
+    const cashflows = await Cashflow.aggregate([
+      { $match: { ...query, type: "ingreso", cancelled: { $exists: false } } },
+      {
+        $project: {
+          id: "$_id",
+          type: 1,
+          amount: 1,
+          employee: 1,
+          store: 1,
+          description: 1,
+          items: 1,
+          _id: 0,
+        },
+      },
+    ]);
 
     query.$or = [{ cancelled: false }, { cancelled: { $exists: false } }];
+    query.$and = [
+      { cash: { $exists: true, $ne: null, $gt: 0 } },
+      { cancelled: { $exists: false } },
+      { lastTypePaymentUpdated: { $exists: false } },
+      { checkoutDate: { $exists: false } },
+    ];
 
     const sales = await Sale.aggregate([
       { $match: query },
@@ -174,11 +233,51 @@ Controllers.getSalesByEmployees = async (req, res) => {
         $project: {
           id: "$_id",
           order: 1,
+          typeSale: 1,
           employee: 1,
           username: 1,
           items: 1,
+          cash: 1,
+          transfer: 1,
+          total: 1,
           total: 1,
           cancelled: 1,
+          description: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    const orders = await Sale.aggregate([
+      {
+        $match: {
+          checkoutDate: {
+            $gte: new Date(date),
+            $lt: addOneDayDate,
+          },
+          $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+          ...(store !== "ALL" && { store: store }),
+        },
+      },
+      {
+        $match: {
+          lastTypePaymentUpdated: "cash",
+        },
+      },
+      {
+        $project: {
+          id: "$_id",
+          order: 1,
+          typeSale: 1,
+          employee: 1,
+          username: 1,
+          items: 1,
+          cash: 1,
+          transfer: 1,
+          total: 1,
+          total: 1,
+          cancelled: 1,
+          description: 1,
           _id: 0,
         },
       },
@@ -186,13 +285,145 @@ Controllers.getSalesByEmployees = async (req, res) => {
 
     const getSalesByEmployees = {};
 
-    sales.forEach((sale) => {
-      getSalesByEmployees[sale.employee]
-        ? getSalesByEmployees[sale.employee].push(sale)
-        : (getSalesByEmployees[sale.employee] = [sale]);
+    sales
+      .map((sale) => ({
+        ...sale,
+        isSale: true,
+        withFlag: Number(sale.transfer || 0) > 0,
+      }))
+      .forEach((sale) => {
+        getSalesByEmployees[sale.employee]
+          ? getSalesByEmployees[sale.employee].push(sale)
+          : (getSalesByEmployees[sale.employee] = [sale]);
+      });
+
+    orders
+      .map((order) => ({
+        ...order,
+        isSale: true,
+        withFlag: Number(order.transfer || 0) > 0,
+      }))
+      .forEach((order) => {
+        getSalesByEmployees[order.employee]
+          ? getSalesByEmployees[order.employee].push(order)
+          : (getSalesByEmployees[order.employee] = [order]);
+      });
+
+    cashflows
+      .map((cashflow) => ({
+        ...cashflow,
+        cash: cashflow.amount,
+        withBackground: true,
+      }))
+      .forEach((cashflow) => {
+        getSalesByEmployees[cashflow.employee]
+          ? getSalesByEmployees[cashflow.employee].push(cashflow)
+          : (getSalesByEmployees[cashflow.employee] = [cashflow]);
+      });
+
+    const reOrderSalesByEmployees = {};
+    const employees = await getAllEmployees();
+    const sortEmployeeByPosition = employees.sort(
+      (a, b) =>
+        (a.position || employees.length + 1) -
+        (b.position || employees.length + 1)
+    );
+    sortEmployeeByPosition.forEach((employee) => {
+      if (getSalesByEmployees[employee.name]) {
+        reOrderSalesByEmployees[employee.name] =
+          getSalesByEmployees[employee.name];
+      }
     });
 
-    res.send({ results: getSalesByEmployees });
+    res.send({ results: reOrderSalesByEmployees });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error al buscar sales" });
+  }
+};
+
+Controllers.getSalesTransferByEmployees = async (req, res) => {
+  try {
+    const { date, store } = req.query;
+
+    const addOneDayDate = new Date(
+      new Date(date).setDate(new Date(date).getDate() + 1)
+    );
+
+    const query = {
+      createdAt: {
+        $gte: new Date(date),
+        $lt: addOneDayDate,
+      },
+    };
+
+    if (store !== "ALL") {
+      query.store = store;
+    }
+
+    query.$or = [{ cancelled: false }, { cancelled: { $exists: false } }];
+    query.$and = [
+      { transfer: { $exists: true, $ne: null, $gt: 0 } },
+      { cancelled: { $exists: false } },
+      { lastTypePaymentUpdated: { $exists: false } },
+      { checkoutDate: { $exists: false } },
+    ];
+
+    const sales = await Sale.aggregate([
+      { $match: query },
+      {
+        $project: {
+          id: "$_id",
+          order: 1,
+          typeSale: 1,
+          employee: 1,
+          username: 1,
+          items: 1,
+          cash: 1,
+          transfer: 1,
+          total: 1,
+          total: 1,
+          cancelled: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    const orders = await Sale.aggregate([
+      {
+        $match: {
+          checkoutDate: {
+            $gte: new Date(date),
+            $lt: addOneDayDate,
+          },
+          $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+          ...(store !== "ALL" && { store: store }),
+        },
+      },
+      {
+        $match: {
+          lastTypePaymentUpdated: "transfer",
+        },
+      },
+      {
+        $project: {
+          id: "$_id",
+          order: 1,
+          typeSale: 1,
+          employee: 1,
+          username: 1,
+          items: 1,
+          cash: 1,
+          transfer: 1,
+          total: 1,
+          total: 1,
+          cancelled: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    res.send({ results: [...sales, ...orders] });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar sales" });
@@ -633,66 +864,32 @@ Controllers.create = async (req, res) => {
       store,
       employee,
       typeSale,
-      typePayment,
       items,
       subTotalItems,
       devolutionItems,
       subTotalDevolutionItems,
-      percentageToDisccountOrAdd,
       username,
       numOrder,
       typeShipment,
-      total,
+      totalCash,
+      totalTransfer,
+      totalFinal,
     } = req.body;
-
-    let numOrderLocalOrPedido;
-
-    if (typeSale === "local") {
-      const lastSaleByEmployee = await Sale.findOne({
-        employee,
-        typeSale: "local",
-        $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
-      })
-        .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
-        .limit(1);
-
-      const findEmployee = await Employee.findOne({
-        name: employee,
-      });
-
-      numOrderLocalOrPedido = findEmployee.enableNewNumOrder
-        ? findEmployee.newNumOrder
-        : !lastSaleByEmployee || lastSaleByEmployee.order >= 100
-        ? 1
-        : lastSaleByEmployee.order + 1;
-
-      if (findEmployee.enableNewNumOrder) {
-        findEmployee.enableNewNumOrder = false;
-        await findEmployee.save();
-      }
-    }
-
-    if (typeSale === "pedido") {
-      numOrderLocalOrPedido = numOrder;
-    }
 
     await Sale.create({
       store,
-      order: numOrderLocalOrPedido,
+      order: numOrder,
       employee,
       typeSale,
-      typePayment,
       typeShipment,
       items,
-      transfer:
-        typeSale === "pedido" && typePayment === "transferencia" ? total : "",
-      cash: typeSale === "pedido" && typePayment === "efectivo" ? total : "",
+      transfer: totalTransfer,
+      cash: totalCash,
       subTotalItems,
       devolutionItems,
       subTotalDevolutionItems,
-      percentageToDisccountOrAdd,
       username,
-      total: total,
+      total: totalFinal,
     });
 
     res.send({ results: "¡Éxito! Se agrego al listado de ventas.!" });
@@ -704,7 +901,7 @@ Controllers.create = async (req, res) => {
 
 Controllers.createSaleByEmployee = async (req, res) => {
   try {
-    const { items, total, employee, store, username } = req.body;
+    const { items, cash, total, employee, store, username } = req.body;
 
     const lastSaleByEmployee = await Sale.findOne({
       employee,
@@ -731,6 +928,7 @@ Controllers.createSaleByEmployee = async (req, res) => {
 
     const newSaleByEmployee = await Sale.create({
       items,
+      cash,
       total,
       typeSale: "local",
       order: numOrderLocal,
@@ -762,6 +960,10 @@ Controllers.updateOrder = async (req, res) => {
     });
 
     saleToUpdate[dataIndex] = value;
+
+    if (["cash", "transfer"].includes(dataIndex)) {
+      saleToUpdate.lastTypePaymentUpdated = dataIndex;
+    }
 
     if (dataIndex === "cash") {
       saleToUpdate.total = saleToUpdate.transfer + value;
@@ -868,6 +1070,79 @@ Controllers.cancelOrders = async (req, res) => {
   }
 };
 
+Controllers.removeSales = async (req, res) => {
+  try {
+    const { salesIds, cashflowIds } = req.body;
+
+    let salesCancelled, cashflowCancelled;
+
+    if (salesIds.length) {
+      const salesIdsToUpdate = salesIds.map(({ id }) => id);
+
+      await Sale.updateMany(
+        { _id: { $in: salesIdsToUpdate } },
+        { $set: { cancelled: true } }
+      );
+
+      salesCancelled = await Sale.aggregate([
+        { $match: { _id: { $in: salesIdsToUpdate } } },
+        {
+          $project: {
+            id: "$_id",
+            order: 1,
+            typeSale: 1,
+            employee: 1,
+            username: 1,
+            items: 1,
+            cash: 1,
+            transfer: 1,
+            total: 1,
+            total: 1,
+            cancelled: 1,
+            description: 1,
+            _id: 0,
+          },
+        },
+      ]);
+    }
+
+    if (cashflowIds.length) {
+      const chasflowsIdsToUpdate = cashflowIds.map(({ id }) => id);
+
+      await Cashflow.updateMany(
+        { _id: { $in: chasflowsIdsToUpdate } },
+        { $set: { cancelled: true } }
+      );
+
+      cashflowCancelled = await Cashflow.aggregate([
+        { $match: { _id: { $in: chasflowsIdsToUpdate } } },
+        {
+          $project: {
+            id: "$_id",
+            type: 1,
+            amount: 1,
+            employee: 1,
+            store: 1,
+            description: 1,
+            items: 1,
+            _id: 0,
+          },
+        },
+      ]);
+    }
+
+    res.send({
+      results: {
+        salesCancelled,
+        cashflowCancelled,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error when creating the Sale" });
+  }
+};
+
 Controllers.getLastNumOrder = async (req, res) => {
   try {
     const { seller } = req.body;
@@ -918,6 +1193,13 @@ const templateRecieve = async ({
   pricesDevolutionWithconcepts,
   totalPrices,
   totalDevolutionPrices,
+  percentageCash,
+  percentageTransfer,
+  cashWithDisccount,
+  transferWithRecharge,
+  totalCash,
+  totalTransfer,
+  totalToPay,
   total,
 }) => {
   const alignRight = (text, width) => {
@@ -963,15 +1245,13 @@ const templateRecieve = async ({
 
   const multiplyBy = percentageToDisccountOrAdd < 0 ? 1 : -1;
 
-  const totalToPay = totalPrices - (totalDevolutionPrices || 0);
-
   const calculateTotalDiscount =
     multiplyBy *
     (totalToPay -
       totalToPay *
         calculateTotalPercentage(Math.abs(percentageToDisccountOrAdd)));
 
-  const lastSaleByEmployee = await Sale.findOne({
+  /*const lastSaleByEmployee = await Sale.findOne({
     seller,
     typeSale: "local",
     $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
@@ -984,7 +1264,8 @@ const templateRecieve = async ({
       ? 1
       : lastSaleByEmployee.order + 1;
 
-  const numOrderLocalOrPedido = typeSale === "local" ? numOrderLocal : numOrder;
+  const numOrderLocalOrPedido = typeSale === "local" ? numOrderLocal : numOrder;*/
+  const numOrderLocalOrPedido = numOrder;
 
   let tpl = `Cenitho Jeans - ${formattedDateTime}\n\n
 Bogota 3419  (011) 2080-1916
@@ -1038,7 +1319,7 @@ Total: ${alignRight(
             0
           )
         ),
-        28
+        29
       )}`;
   }
 
@@ -1053,24 +1334,48 @@ Total: ${alignRight(
     tpl =
       tpl +
       `
-
-Total a descontar: ${alignRight(formatCurrency(totalDevolutionPrices), 15)}`;
-  }
-
-  if (percentageToDisccountOrAdd !== 0) {
-    tpl =
-      tpl +
-      `
-Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 20)}
-${titleTotal}      ${percentageToDisccountOrAdd}% | ${formatCurrency(
-        calculateTotalDiscount
-      )}`;
+Total a descontar: ${alignRight(formatCurrency(totalDevolutionPrices), 17)}`;
   }
 
   tpl =
     tpl +
     `
-  
+
+Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 22)}
+`;
+
+  if (cashWithDisccount && cashWithDisccount !== 0) {
+    tpl =
+      tpl +
+      `
+
+Descuento: ${alignRight(formatCurrency(cashWithDisccount), 22)}`;
+  }
+
+  if (transferWithRecharge && transferWithRecharge !== 0) {
+    tpl =
+      tpl +
+      `
+Gastos Bancarios: ${alignRight(formatCurrency(transferWithRecharge), 15)}
+`;
+  }
+
+  if (totalCash !== 0) {
+    tpl =
+      tpl +
+      `
+Importe Efectivo: ${alignRight(formatCurrency(totalCash), 19)}`;
+  }
+  if (totalTransfer !== 0) {
+    tpl =
+      tpl +
+      `
+Importe Transferencia: ${alignRight(formatCurrency(totalTransfer), 14)}`;
+  }
+
+  tpl =
+    tpl +
+    `
 Total Final: ${alignRight(formatCurrency(total), 24)}
   `;
 
@@ -1099,6 +1404,13 @@ Controllers.print = async (req, res) => {
       pricesDevolutionWithconcepts,
       totalPrices,
       totalDevolutionPrices,
+      percentageCash,
+      percentageTransfer,
+      cashWithDisccount,
+      transferWithRecharge,
+      totalCash,
+      totalTransfer,
+      totalToPay,
       total,
     } = req.body;
 
@@ -1114,6 +1426,13 @@ Controllers.print = async (req, res) => {
       pricesDevolutionWithconcepts,
       totalPrices,
       totalDevolutionPrices,
+      percentageCash,
+      percentageTransfer,
+      cashWithDisccount,
+      transferWithRecharge,
+      totalCash,
+      totalTransfer,
+      totalToPay,
       total,
     });
 

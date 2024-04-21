@@ -24,6 +24,9 @@ const SaleSchema = mongoose.Schema(
     typeShipment: {
       type: String,
     },
+    lastTypePaymentUpdated: {
+      type: String,
+    },
     transfer: {
       type: Number,
     },
@@ -50,6 +53,9 @@ const SaleSchema = mongoose.Schema(
     },
     total: {
       type: Number,
+    },
+    description: {
+      type: String,
     },
     checkoutDate: {
       type: Date,
