@@ -184,6 +184,71 @@ Controllers.getOrders = async (req, res) => {
   }
 };
 
+Controllers.getOrdersCheckoutDate = async (req, res) => {
+  try {
+    const { startDate, endDate, typeSale, store, typeShipment } = req.query;
+
+    const addOneDayDate = new Date(
+      new Date(endDate).setDate(new Date(endDate).getDate() + 1)
+    );
+
+    const query = {
+      checkoutDate: {
+        $gte: new Date(startDate),
+        $lt: addOneDayDate,
+      },
+    };
+
+    if (store) {
+      query.store = store;
+    }
+
+    if (typeShipment) {
+      query.typeShipment = typeShipment;
+    }
+
+    query.typeSale = typeSale;
+
+    const orders = await Sale.aggregate([
+      { $match: query },
+      {
+        $project: {
+          id: "$_id",
+          store: 1,
+          order: 1,
+          employee: 1,
+          typeShipment: 1,
+          lastTypePaymentUpdated: 1,
+          transfer: 1,
+          cash: 1,
+          items: 1,
+          username: 1,
+          total: 1,
+          cancelled: 1,
+          checkoutDate: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$checkoutDate",
+            },
+          },
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+          _id: 0,
+        },
+      },
+    ]);
+
+    res.send({ results: orders });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error al buscar ordenes" });
+  }
+};
+
 Controllers.getSalesCashByEmployees = async (req, res) => {
   try {
     const { date, store } = req.query;

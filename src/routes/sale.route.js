@@ -4,6 +4,7 @@ const { Controllers } = require("../controllers/sale.controller");
 
 router.get("/sales", Controllers.getSales);
 router.get("/orders", Controllers.getOrders);
+router.get("/orders-checkoutdate", Controllers.getOrdersCheckoutDate);
 router.get("/reports", Controllers.getReports);
 router.get("/sales-cash-by-employees", Controllers.getSalesCashByEmployees);
 router.get(
