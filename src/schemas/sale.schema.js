@@ -24,9 +24,6 @@ const SaleSchema = mongoose.Schema(
     typeShipment: {
       type: String,
     },
-    lastTypePaymentUpdated: {
-      type: String,
-    },
     transfer: {
       type: Number,
     },
@@ -61,6 +58,9 @@ const SaleSchema = mongoose.Schema(
       type: Date,
     },
     cancelled: {
+      type: Boolean,
+    },
+    isWithPrepaid: {
       type: Boolean,
     },
   },

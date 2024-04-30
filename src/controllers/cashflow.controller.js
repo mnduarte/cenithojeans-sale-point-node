@@ -6,7 +6,8 @@ const Cashflow = new BaseModel("Cashflow");
 
 Controllers.create = async (req, res) => {
   try {
-    const { type, amount, employee, store, description, items } = req.body;
+    const { type, amount, employee, store, description, items, typePayment } =
+      req.body;
 
     const newCashFlow = await Cashflow.create({
       type,
@@ -15,6 +16,7 @@ Controllers.create = async (req, res) => {
       store,
       description,
       items,
+      typePayment,
     });
 
     res.send({
@@ -54,6 +56,7 @@ Controllers.getCashflowByDay = async (req, res) => {
           employee: 1,
           store: 1,
           description: 1,
+          typePayment: 1,
           items: 1,
           _id: 0,
         },
@@ -65,11 +68,20 @@ Controllers.getCashflowByDay = async (req, res) => {
       outgoings: [],
     };
 
-    cashflows.forEach((cashflow) => {
-      cashflow.type === "ingreso"
-        ? cashflowByType.incomes.push(cashflow)
-        : cashflowByType.outgoings.push(cashflow);
-    });
+    cashflows
+      .map((cashflow) => ({
+        ...cashflow,
+        cash:
+          !Boolean(cashflow.typePayment) || cashflow.typePayment === "cash"
+            ? cashflow.amount
+            : 0,
+        transfer: cashflow.typePayment === "transfer" ? cashflow.amount : 0,
+      }))
+      .forEach((cashflow) => {
+        cashflow.type === "ingreso"
+          ? cashflowByType.incomes.push(cashflow)
+          : cashflowByType.outgoings.push(cashflow);
+      });
 
     res.send({ results: cashflowByType });
   } catch (error) {

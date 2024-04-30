@@ -257,19 +257,20 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       new Date(date).setDate(new Date(date).getDate() + 1)
     );
 
-    const query = {
-      createdAt: {
-        $gte: new Date(date),
-        $lt: addOneDayDate,
-      },
-    };
-
-    if (store !== "ALL") {
-      query.store = store;
-    }
-
     const cashflows = await Cashflow.aggregate([
-      { $match: { ...query, type: "ingreso", cancelled: { $exists: false } } },
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(date),
+            $lt: addOneDayDate,
+          },
+          type: "ingreso",
+          cancelled: { $exists: false },
+          $or: [{ typePayment: { $exists: false } }, { typePayment: "cash" }],
+
+          ...(store !== "ALL" && { store: store }),
+        },
+      },
       {
         $project: {
           id: "$_id",
@@ -284,16 +285,19 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       },
     ]);
 
-    query.$or = [{ cancelled: false }, { cancelled: { $exists: false } }];
-    query.$and = [
-      { cash: { $exists: true, $ne: null, $gt: 0 } },
-      { cancelled: { $exists: false } },
-      { lastTypePaymentUpdated: { $exists: false } },
-      { checkoutDate: { $exists: false } },
-    ];
-
     const sales = await Sale.aggregate([
-      { $match: query },
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(date),
+            $lt: addOneDayDate,
+          },
+          typeSale: "local",
+          $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+          $and: [{ checkoutDate: { $exists: false } }],
+          ...(store !== "ALL" && { store: store }),
+        },
+      },
       {
         $project: {
           id: "$_id",
@@ -320,13 +324,14 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
             $gte: new Date(date),
             $lt: addOneDayDate,
           },
+          typeSale: "pedido",
+          cash: { $gt: 0 },
           $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+          $or: [
+            { isWithPrepaid: false },
+            { isWithPrepaid: { $exists: false } },
+          ],
           ...(store !== "ALL" && { store: store }),
-        },
-      },
-      {
-        $match: {
-          lastTypePaymentUpdated: "cash",
         },
       },
       {
@@ -348,11 +353,49 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       },
     ]);
 
+    const ordersWithPrepaid = await Sale.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(date),
+            $lt: addOneDayDate,
+          },
+          typeSale: "pedido",
+          isWithPrepaid: true,
+          cash: { $gt: 0 },
+          $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+          ...(store !== "ALL" && { store: store }),
+        },
+      },
+      {
+        $project: {
+          id: "$_id",
+          order: 1,
+          typeSale: 1,
+          employee: 1,
+          username: 1,
+          items: 1,
+          cash: 1,
+          transfer: 1,
+          total: 1,
+          total: 1,
+          cancelled: 1,
+          description: 1,
+          isWithPrepaid: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
     const getSalesByEmployees = {};
 
     sales
       .map((sale) => ({
         ...sale,
+        cash:
+          !Boolean(sale.cash) && !Boolean(sale.transfer)
+            ? sale.total
+            : sale.cash,
         isSale: true,
         withFlag: Number(sale.transfer || 0) > 0,
       }))
@@ -360,18 +403,6 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
         getSalesByEmployees[sale.employee]
           ? getSalesByEmployees[sale.employee].push(sale)
           : (getSalesByEmployees[sale.employee] = [sale]);
-      });
-
-    orders
-      .map((order) => ({
-        ...order,
-        isSale: true,
-        withFlag: Number(order.transfer || 0) > 0,
-      }))
-      .forEach((order) => {
-        getSalesByEmployees[order.employee]
-          ? getSalesByEmployees[order.employee].push(order)
-          : (getSalesByEmployees[order.employee] = [order]);
       });
 
     cashflows
@@ -384,6 +415,26 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
         getSalesByEmployees[cashflow.employee]
           ? getSalesByEmployees[cashflow.employee].push(cashflow)
           : (getSalesByEmployees[cashflow.employee] = [cashflow]);
+      });
+
+    ordersWithPrepaid
+      .map((order) => ({
+        ...order,
+      }))
+      .forEach((order) => {
+        getSalesByEmployees[order.employee]
+          ? getSalesByEmployees[order.employee].push(order)
+          : (getSalesByEmployees[order.employee] = [order]);
+      });
+
+    orders
+      .map((order) => ({
+        ...order,
+      }))
+      .forEach((order) => {
+        getSalesByEmployees[order.employee]
+          ? getSalesByEmployees[order.employee].push(order)
+          : (getSalesByEmployees[order.employee] = [order]);
       });
 
     const reOrderSalesByEmployees = {};
@@ -426,12 +477,12 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
       query.store = store;
     }
 
+    query.typeSale = "local";
+
     query.$or = [{ cancelled: false }, { cancelled: { $exists: false } }];
     query.$and = [
       { transfer: { $exists: true, $ne: null, $gt: 0 } },
       { cancelled: { $exists: false } },
-      { lastTypePaymentUpdated: { $exists: false } },
-      { checkoutDate: { $exists: false } },
     ];
 
     const sales = await Sale.aggregate([
@@ -454,41 +505,7 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
       },
     ]);
 
-    const orders = await Sale.aggregate([
-      {
-        $match: {
-          checkoutDate: {
-            $gte: new Date(date),
-            $lt: addOneDayDate,
-          },
-          $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
-          ...(store !== "ALL" && { store: store }),
-        },
-      },
-      {
-        $match: {
-          lastTypePaymentUpdated: "transfer",
-        },
-      },
-      {
-        $project: {
-          id: "$_id",
-          order: 1,
-          typeSale: 1,
-          employee: 1,
-          username: 1,
-          items: 1,
-          cash: 1,
-          transfer: 1,
-          total: 1,
-          total: 1,
-          cancelled: 1,
-          _id: 0,
-        },
-      },
-    ]);
-
-    res.send({ results: [...sales, ...orders] });
+    res.send({ results: sales });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar sales" });
@@ -939,6 +956,7 @@ Controllers.create = async (req, res) => {
       totalCash,
       totalTransfer,
       totalFinal,
+      isWithPrepaid,
     } = req.body;
 
     await Sale.create({
@@ -955,6 +973,7 @@ Controllers.create = async (req, res) => {
       subTotalDevolutionItems,
       username,
       total: totalFinal,
+      isWithPrepaid,
     });
 
     res.send({ results: "¡Éxito! Se agrego al listado de ventas.!" });
@@ -1025,10 +1044,6 @@ Controllers.updateOrder = async (req, res) => {
     });
 
     saleToUpdate[dataIndex] = value;
-
-    if (["cash", "transfer"].includes(dataIndex)) {
-      saleToUpdate.lastTypePaymentUpdated = dataIndex;
-    }
 
     if (dataIndex === "cash") {
       saleToUpdate.total = saleToUpdate.transfer + value;
