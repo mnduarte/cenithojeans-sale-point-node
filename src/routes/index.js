@@ -7,6 +7,8 @@ const storeRoutes = require("./store.route");
 const saleRoutes = require("./sale.route");
 const cashflowRoutes = require("./cashflow.route");
 const observationRoutes = require("./observation.route");
+const graphRoutes = require("./graph.route");
+
 /*
 // Función para agregar retraso
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,5 +27,6 @@ router.use("/store", storeRoutes);
 router.use("/sale", saleRoutes);
 router.use("/cashflow", cashflowRoutes);
 router.use("/observation", observationRoutes);
+router.use("/graph", graphRoutes);
 
 module.exports = router;

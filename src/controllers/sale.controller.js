@@ -265,7 +265,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
             $lt: addOneDayDate,
           },
           type: "ingreso",
-          cancelled: { $exists: false },
+          cancelled: { $ne: true },
           $or: [{ typePayment: { $exists: false } }, { typePayment: "cash" }],
 
           ...(store !== "ALL" && { store: store }),
@@ -294,6 +294,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           },
           typeSale: "local",
           $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+          cancelled: { $ne: true },
           $and: [{ checkoutDate: { $exists: false } }],
           ...(store !== "ALL" && { store: store }),
         },
@@ -326,11 +327,18 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           },
           typeSale: "pedido",
           cash: { $gt: 0 },
-          $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
           $or: [
-            { isWithPrepaid: false },
-            { isWithPrepaid: { $exists: false } },
+            {
+              $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+            },
+            {
+              $or: [
+                { isWithPrepaid: false },
+                { isWithPrepaid: { $exists: false } },
+              ],
+            },
           ],
+          cancelled: { $ne: true },
           ...(store !== "ALL" && { store: store }),
         },
       },
@@ -364,6 +372,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           isWithPrepaid: true,
           cash: { $gt: 0 },
           $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+          cancelled: { $ne: true },
           ...(store !== "ALL" && { store: store }),
         },
       },
@@ -451,7 +460,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       }
     });
 
-    res.send({ results: reOrderSalesByEmployees });
+    res.send({ results: reOrderSalesByEmployees, orders });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar sales" });
@@ -480,6 +489,7 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
     query.typeSale = "local";
 
     query.$or = [{ cancelled: false }, { cancelled: { $exists: false } }];
+    query.cancelled = { $ne: true };
     query.$and = [
       { transfer: { $exists: true, $ne: null, $gt: 0 } },
       { cancelled: { $exists: false } },
@@ -530,6 +540,7 @@ Controllers.getReports = async (req, res) => {
     query.typeSale = typeSale;
 
     query.$or = [{ cancelled: false }, { cancelled: { $exists: false } }];
+    query.cancelled = { $ne: true };
 
     const salesByDays = await Sale.aggregate([
       { $match: query },
@@ -991,6 +1002,7 @@ Controllers.createSaleByEmployee = async (req, res) => {
       employee,
       typeSale: "local",
       $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+      cancelled: { $ne: true },
     })
       .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
       .limit(1);
@@ -1231,6 +1243,7 @@ Controllers.getLastNumOrder = async (req, res) => {
       employee: seller,
       typeSale: "local",
       $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+      cancelled: { $ne: true },
     })
       .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
       .limit(1);
