@@ -160,6 +160,7 @@ Controllers.getOrders = async (req, res) => {
           username: 1,
           total: 1,
           cancelled: 1,
+          isWithPrepaid: 1,
           checkoutDate: {
             $dateToString: {
               format: "%d/%m/%Y",
