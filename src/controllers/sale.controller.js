@@ -1090,21 +1090,27 @@ Controllers.updateOrder = async (req, res) => {
 Controllers.updateSaleByEmployee = async (req, res) => {
   try {
     const { id, dataIndex, value } = req.body;
-    const updatedPrice = await Sale.findByIdAndUpdate(
-      { _id: id },
-      { [dataIndex]: value }
-    );
+
+    const saleToUpdate = await Sale.findOne({
+      _id: id,
+    });
+
+    saleToUpdate[dataIndex] = value;
+
+    if (dataIndex === "cash") {
+      saleToUpdate.total = saleToUpdate.transfer + value;
+    }
+
+    if (dataIndex === "transfer") {
+      saleToUpdate.total = saleToUpdate.cash + value;
+    }
+
+    await saleToUpdate.save();
 
     const transformedResults = {
-      ...updatedPrice._doc,
-      id: updatedPrice._id,
+      ...saleToUpdate._doc,
+      id: saleToUpdate._id,
     };
-
-    if (updatedPrice.checkoutDate) {
-      transformedResults.checkoutDate = formatCheckoutDate(
-        updatedPrice.checkoutDate
-      );
-    }
 
     res.send({
       results: transformedResults,
@@ -1438,6 +1444,19 @@ Total a descontar: ${alignRight(formatCurrency(totalDevolutionPrices), 17)}`;
 Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 22)}
 `;
 
+  if (totalCash !== 0) {
+    tpl =
+      tpl +
+      `
+Importe Efectivo: ${alignRight(formatCurrency(totalCash), 19)}`;
+  }
+  if (totalTransfer !== 0) {
+    tpl =
+      tpl +
+      `
+Importe Transferencia: ${alignRight(formatCurrency(totalTransfer), 14)}`;
+  }
+
   if (cashWithDisccount && cashWithDisccount !== 0) {
     tpl =
       tpl +
@@ -1452,19 +1471,6 @@ Descuento: ${alignRight(formatCurrency(cashWithDisccount), 22)}`;
       `
 Gastos Bancarios: ${alignRight(formatCurrency(transferWithRecharge), 15)}
 `;
-  }
-
-  if (totalCash !== 0) {
-    tpl =
-      tpl +
-      `
-Importe Efectivo: ${alignRight(formatCurrency(totalCash), 19)}`;
-  }
-  if (totalTransfer !== 0) {
-    tpl =
-      tpl +
-      `
-Importe Transferencia: ${alignRight(formatCurrency(totalTransfer), 14)}`;
   }
 
   tpl =

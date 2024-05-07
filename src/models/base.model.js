@@ -36,8 +36,11 @@ class BaseModel {
    * @param {Function} next
    */
   async create(data) {
-    const now = new Date();
-    now.setHours(now.getHours() - 3);
+    const now = data.date ? new Date(data.date) : new Date();
+
+    if (!data.date) {
+      now.setHours(now.getHours() - 3);
+    }
 
     data.createdAt = now;
 

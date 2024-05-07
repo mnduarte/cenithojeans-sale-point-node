@@ -6,8 +6,16 @@ const Cashflow = new BaseModel("Cashflow");
 
 Controllers.create = async (req, res) => {
   try {
-    const { type, amount, employee, store, description, items, typePayment } =
-      req.body;
+    const {
+      type,
+      amount,
+      employee,
+      store,
+      description,
+      items,
+      typePayment,
+      date,
+    } = req.body;
 
     const newCashFlow = await Cashflow.create({
       type,
@@ -17,13 +25,15 @@ Controllers.create = async (req, res) => {
       description,
       items,
       typePayment,
+      date,
     });
 
     res.send({
       results: newCashFlow,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error al crear precio" });
+    console.log(error);
+    res.status(500).json({ message: `Error al crear` });
   }
 };
 
