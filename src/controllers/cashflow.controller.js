@@ -117,6 +117,7 @@ Controllers.getOutgoingsByDay = async (req, res) => {
 
     query.store = store;
     query.type = "egreso";
+    query.cancelled = { $ne: true };
 
     const outgoings = await Cashflow.aggregate([
       { $match: query },

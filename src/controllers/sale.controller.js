@@ -516,7 +516,45 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
       },
     ]);
 
-    res.send({ results: sales });
+    const cashflows = await Cashflow.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(date),
+            $lt: addOneDayDate,
+          },
+          type: "ingreso",
+          cancelled: { $ne: true },
+          $or: [
+            { typePayment: { $exists: false } },
+            { typePayment: "transfer" },
+          ],
+
+          ...(store !== "ALL" && { store: store }),
+        },
+      },
+      {
+        $project: {
+          id: "$_id",
+          type: 1,
+          amount: 1,
+          employee: 1,
+          store: 1,
+          description: 1,
+          items: 1,
+          typePayment: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    const cashflowWrapper = cashflows.map((cashflow) => ({
+      ...cashflow,
+      transfer: cashflow.amount,
+      withBackground: true,
+    }));
+
+    res.send({ results: [...sales, ...cashflowWrapper] });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar sales" });
@@ -530,421 +568,1099 @@ Controllers.getReports = async (req, res) => {
     const firstDayOfMonth = new Date(year, month, 1);
     const firstDayOfNextMonth = new Date(year, month + 1, 1);
 
-    const query = {
-      createdAt: {
-        $gte: firstDayOfMonth,
-        $lt: firstDayOfNextMonth,
-      },
-    };
+    const employees = await getAllEmployees();
 
-    query.store = store;
-    query.typeSale = typeSale;
-
-    query.$or = [{ cancelled: false }, { cancelled: { $exists: false } }];
-    query.cancelled = { $ne: true };
-
-    const salesByDays = await Sale.aggregate([
-      { $match: query },
-      {
-        $project: {
-          id: "$_id",
-          order: 1,
-          employee: 1,
-          cash: "$cash",
-          transfer: "$transfer",
-          items: 1,
-          total: 1,
-          _id: 0,
-          date: {
-            $dateToString: {
-              format: "%d/%m/%Y",
-              date: "$createdAt",
-            },
-          },
-          week: { $isoWeek: "$createdAt" },
+    if (typeSale === "local") {
+      const query = {
+        createdAt: {
+          $gte: firstDayOfMonth,
+          $lt: firstDayOfNextMonth,
         },
-      },
-      {
-        $group: {
-          _id: { week: "$week", date: "$date" },
-          items: { $sum: "$items" },
-          cash: { $sum: "$cash" },
-          transfer: { $sum: "$transfer" },
-          total: { $sum: "$total" },
-        },
-      },
-      {
-        $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
-      },
-      {
-        $group: {
-          _id: "$_id.week",
-          salesGeneral: {
-            $push: {
-              date: "$_id.date",
-              items: "$items",
-              cash: "$cash",
-              transfer: "$transfer",
-              total: "$total",
+      };
+
+      query.store = store;
+      query.typeSale = typeSale;
+
+      query.$or = [{ cancelled: false }, { cancelled: { $exists: false } }];
+      query.cancelled = { $ne: true };
+      query.$and = [{ checkoutDate: { $exists: false } }];
+
+      const salesByDays = await Sale.aggregate([
+        { $match: { ...query, cash: { $gt: 0 } } },
+        {
+          $project: {
+            id: "$_id",
+            order: 1,
+            employee: 1,
+            cash: "$cash",
+            transfer: "$transfer",
+            items: 1,
+            total: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$createdAt",
+              },
             },
+            week: { $isoWeek: "$createdAt" },
           },
         },
-      },
-      {
-        $project: {
-          week: "$_id",
-          salesGeneral: 1,
-        },
-      },
-      {
-        $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
-      },
-    ]);
-
-    const salesByEmployees = await Sale.aggregate([
-      { $match: query },
-      {
-        $project: {
-          id: "$_id",
-          order: 1,
-          employee: 1,
-          cash: 1,
-          transfer: 1,
-          items: 1,
-          total: 1,
-          _id: 0,
-          date: {
-            $dateToString: {
-              format: "%d/%m/%Y",
-              date: "$createdAt",
-            },
+        {
+          $group: {
+            _id: { week: "$week", date: "$date" },
+            items: { $sum: "$items" },
+            cash: { $sum: "$cash" },
+            transfer: { $sum: "$transfer" },
+            total: { $sum: "$total" },
           },
-          week: { $isoWeek: "$createdAt" },
         },
-      },
-      {
-        $group: {
-          _id: { week: "$week", date: "$date", employee: "$employee" },
-          items: { $sum: "$items" },
-          cash: { $sum: "$cash" },
-          transfer: { $sum: "$transfer" },
-          total: { $sum: "$total" },
+        {
+          $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
         },
-      },
-      {
-        $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
-      },
-      {
-        $group: {
-          _id: { week: "$_id.week", employee: "$_id.employee" },
-          days: {
-            $push: {
-              date: "$_id.date",
-              items: "$items",
-              cash: "$cash",
-              transfer: "$transfer",
-              total: "$total",
+        {
+          $group: {
+            _id: "$_id.week",
+            salesGeneral: {
+              $push: {
+                date: "$_id.date",
+                items: "$items",
+                cash: "$cash",
+                transfer: "$transfer",
+                total: "$total",
+              },
             },
           },
         },
-      },
-      {
-        $sort: { "_id.employee": 1 }, // Ordenar por empleado ascendente
-      },
-      {
-        $group: {
-          _id: "$_id.week",
-          employees: {
-            $push: {
-              employee: "$_id.employee",
-              days: "$days",
+        {
+          $project: {
+            week: "$_id",
+            salesGeneral: 1,
+          },
+        },
+        {
+          $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
+        },
+      ]);
+
+      const ordersByDays = await Sale.aggregate([
+        {
+          $match: {
+            checkoutDate: {
+              $gte: firstDayOfMonth,
+              $lt: firstDayOfNextMonth,
+            },
+            typeSale: "pedido",
+            store: store,
+            cash: { $gt: 0 },
+            $or: [
+              {
+                $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+              },
+              {
+                $or: [
+                  { isWithPrepaid: false },
+                  { isWithPrepaid: { $exists: false } },
+                ],
+              },
+            ],
+            cancelled: { $ne: true },
+          },
+        },
+        {
+          $project: {
+            id: "$_id",
+            order: 1,
+            employee: 1,
+            cash: "$cash",
+            transfer: "$transfer",
+            items: 1,
+            total: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$checkoutDate",
+              },
+            },
+            week: { $isoWeek: "$checkoutDate" },
+          },
+        },
+        {
+          $group: {
+            _id: { week: "$week", date: "$date" },
+            items: { $sum: "$items" },
+            cash: { $sum: "$cash" },
+            transfer: { $sum: "$transfer" },
+            total: { $sum: "$total" },
+          },
+        },
+        {
+          $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
+        },
+        {
+          $group: {
+            _id: "$_id.week",
+            salesGeneral: {
+              $push: {
+                date: "$_id.date",
+                items: "$items",
+                cash: "$cash",
+                transfer: "$transfer",
+                total: "$total",
+              },
             },
           },
         },
-      },
-      {
-        $project: {
-          week: "$_id",
-          employees: 1,
-          _id: 0,
-        },
-      },
-      {
-        $sort: { week: 1 },
-      },
-    ]);
-
-    const queryCashflow = {
-      createdAt: {
-        $gte: firstDayOfMonth,
-        $lt: firstDayOfNextMonth,
-      },
-    };
-
-    queryCashflow.store = store;
-
-    const cashflowsResumeOutgoings = await Cashflow.aggregate([
-      { $match: { ...queryCashflow, type: "egreso" } },
-      {
-        $project: {
-          id: "$_id",
-          type: 1,
-          amount: 1,
-          store: 1,
-          _id: 0,
-          date: {
-            $dateToString: {
-              format: "%d/%m/%Y",
-              date: "$createdAt",
-            },
-          },
-          week: { $isoWeek: "$createdAt" },
-        },
-      },
-      {
-        $group: {
-          _id: { week: "$week", date: "$date" },
-          amount: { $sum: "$amount" },
-        },
-      },
-      {
-        $group: {
-          _id: "$_id.week",
-          days: {
-            $push: {
-              date: "$_id.date",
-              amount: "$amount",
-            },
+        {
+          $project: {
+            week: "$_id",
+            salesGeneral: 1,
           },
         },
-      },
-      {
-        $project: {
-          week: "$_id",
-          days: 1,
+        {
+          $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
         },
-      },
-      {
-        $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
-      },
-    ]);
+      ]);
 
-    const cashflowsResumeIncomes = await Cashflow.aggregate([
-      { $match: { ...queryCashflow, type: "ingreso" } },
-      {
-        $project: {
-          id: "$_id",
-          type: 1,
-          amount: 1,
-          items: 1,
-          store: 1,
-          _id: 0,
-          date: {
-            $dateToString: {
-              format: "%d/%m/%Y",
-              date: "$createdAt",
+      const ordersWithPrepaid = await Sale.aggregate([
+        {
+          $match: {
+            createdAt: {
+              $gte: firstDayOfMonth,
+              $lt: firstDayOfNextMonth,
             },
+            typeSale: "pedido",
+            isWithPrepaid: true,
+            cash: { $gt: 0 },
+            $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+            cancelled: { $ne: true },
+            store: store,
           },
-          week: { $isoWeek: "$createdAt" },
         },
-      },
-      {
-        $group: {
-          _id: { week: "$week", date: "$date" },
-          amount: { $sum: "$amount" },
-          items: { $sum: "$items" },
+        {
+          $project: {
+            id: "$_id",
+            order: 1,
+            employee: 1,
+            cash: "$cash",
+            transfer: "$transfer",
+            items: 1,
+            total: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$createdAt",
+              },
+            },
+            week: { $isoWeek: "$createdAt" },
+          },
         },
-      },
-      {
-        $group: {
-          _id: "$_id.week",
-          days: {
-            $push: {
-              date: "$_id.date",
-              amount: "$amount",
-              items: "$items",
+        {
+          $group: {
+            _id: { week: "$week", date: "$date" },
+            items: { $sum: "$items" },
+            cash: { $sum: "$cash" },
+            transfer: { $sum: "$transfer" },
+            total: { $sum: "$total" },
+          },
+        },
+        {
+          $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
+        },
+        {
+          $group: {
+            _id: "$_id.week",
+            salesGeneral: {
+              $push: {
+                date: "$_id.date",
+                items: "$items",
+                cash: "$cash",
+                transfer: "$transfer",
+                total: "$total",
+              },
             },
           },
         },
-      },
-      {
-        $project: {
-          week: "$_id",
-          days: 1,
+        {
+          $project: {
+            week: "$_id",
+            salesGeneral: 1,
+          },
         },
-      },
-      {
-        $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
-      },
-    ]);
+        {
+          $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
+        },
+      ]);
 
-    const cashflowsResumeIncomesByEmployee = await Cashflow.aggregate([
-      { $match: { ...queryCashflow, type: "ingreso" } },
-      {
-        $project: {
-          id: "$_id",
-          employee: 1,
-          type: 1,
-          amount: 1,
-          items: 1,
-          store: 1,
-          _id: 0,
-          date: {
-            $dateToString: {
-              format: "%d/%m/%Y",
-              date: "$createdAt",
+      const salesByEmployees = await Sale.aggregate([
+        { $match: query },
+        {
+          $project: {
+            id: "$_id",
+            order: 1,
+            employee: 1,
+            cash: 1,
+            transfer: 1,
+            items: 1,
+            total: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$createdAt",
+              },
             },
+            week: { $isoWeek: "$createdAt" },
           },
-          week: { $isoWeek: "$createdAt" },
         },
-      },
-      {
-        $group: {
-          _id: { week: "$week", date: "$date", employee: "$employee" },
-          amount: { $sum: "$amount" },
-          items: { $sum: "$items" },
-        },
-      },
-      {
-        $group: {
-          _id: { week: "$_id.week", employee: "$_id.employee" },
-          days: {
-            $push: {
-              date: "$_id.date",
-              amount: "$amount",
-              items: "$items",
-            },
+        {
+          $group: {
+            _id: { week: "$week", date: "$date", employee: "$employee" },
+            items: { $sum: "$items" },
+            cash: { $sum: "$cash" },
+            transfer: { $sum: "$transfer" },
+            total: { $sum: "$total" },
           },
-          totalAmount: { $sum: "$amount" },
-          totalItems: { $sum: "$items" },
         },
-      },
-      {
-        $group: {
-          _id: "$_id.week",
-          employees: {
-            $push: {
-              employee: "$_id.employee",
-              days: "$days",
-              totalAmount: "$totalAmount",
-              totalItems: "$totalItems",
+        {
+          $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
+        },
+        {
+          $group: {
+            _id: { week: "$_id.week", employee: "$_id.employee" },
+            days: {
+              $push: {
+                date: "$_id.date",
+                items: "$items",
+                cash: "$cash",
+                transfer: "$transfer",
+                total: "$total",
+              },
             },
           },
         },
-      },
-      {
-        $project: {
-          week: "$_id",
-          employees: 1,
-          _id: 0,
+        {
+          $sort: { "_id.employee": 1 }, // Ordenar por empleado ascendente
         },
-      },
-      {
-        $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
-      },
-    ]);
+        {
+          $group: {
+            _id: "$_id.week",
+            employees: {
+              $push: {
+                employee: "$_id.employee",
+                days: "$days",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            week: "$_id",
+            employees: 1,
+            _id: 0,
+          },
+        },
+        {
+          $sort: { week: 1 },
+        },
+      ]);
 
-    const weekWithDays = {};
+      const ordersByEmployees = await Sale.aggregate([
+        {
+          $match: {
+            checkoutDate: {
+              $gte: firstDayOfMonth,
+              $lt: firstDayOfNextMonth,
+            },
+            typeSale: "pedido",
+            cash: { $gt: 0 },
+            store: store,
+            $or: [
+              {
+                $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+              },
+              {
+                $or: [
+                  { isWithPrepaid: false },
+                  { isWithPrepaid: { $exists: false } },
+                ],
+              },
+            ],
+            cancelled: { $ne: true },
+          },
+        },
+        {
+          $project: {
+            id: "$_id",
+            order: 1,
+            employee: 1,
+            cash: 1,
+            transfer: 1,
+            items: 1,
+            total: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$checkoutDate",
+              },
+            },
+            week: { $isoWeek: "$checkoutDate" },
+          },
+        },
+        {
+          $group: {
+            _id: { week: "$week", date: "$date", employee: "$employee" },
+            items: { $sum: "$items" },
+            cash: { $sum: "$cash" },
+            transfer: { $sum: "$transfer" },
+            total: { $sum: "$total" },
+          },
+        },
+        {
+          $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
+        },
+        {
+          $group: {
+            _id: { week: "$_id.week", employee: "$_id.employee" },
+            days: {
+              $push: {
+                date: "$_id.date",
+                items: "$items",
+                cash: "$cash",
+                transfer: "$transfer",
+                total: "$total",
+              },
+            },
+          },
+        },
+        {
+          $sort: { "_id.employee": 1 }, // Ordenar por empleado ascendente
+        },
+        {
+          $group: {
+            _id: "$_id.week",
+            employees: {
+              $push: {
+                employee: "$_id.employee",
+                days: "$days",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            week: "$_id",
+            employees: 1,
+            _id: 0,
+          },
+        },
+        {
+          $sort: { week: 1 },
+        },
+      ]);
 
-    salesByDays.forEach((resumeWeek) => {
-      weekWithDays[resumeWeek.week] = resumeWeek.salesGeneral.map(
-        ({ date }) => date
-      );
-    });
+      const ordersWithPrepaidByEmployees = await Sale.aggregate([
+        {
+          $match: {
+            ...query,
+            typeSale: "pedido",
+            isWithPrepaid: true,
+            cash: { $gt: 0 },
+            $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+            cancelled: { $ne: true },
+          },
+        },
+        {
+          $project: {
+            id: "$_id",
+            order: 1,
+            employee: 1,
+            cash: 1,
+            transfer: 1,
+            items: 1,
+            total: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$createdAt",
+              },
+            },
+            week: { $isoWeek: "$createdAt" },
+          },
+        },
+        {
+          $group: {
+            _id: { week: "$week", date: "$date", employee: "$employee" },
+            items: { $sum: "$items" },
+            cash: { $sum: "$cash" },
+            transfer: { $sum: "$transfer" },
+            total: { $sum: "$total" },
+          },
+        },
+        {
+          $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
+        },
+        {
+          $group: {
+            _id: { week: "$_id.week", employee: "$_id.employee" },
+            days: {
+              $push: {
+                date: "$_id.date",
+                items: "$items",
+                cash: "$cash",
+                transfer: "$transfer",
+                total: "$total",
+              },
+            },
+          },
+        },
+        {
+          $sort: { "_id.employee": 1 }, // Ordenar por empleado ascendente
+        },
+        {
+          $group: {
+            _id: "$_id.week",
+            employees: {
+              $push: {
+                employee: "$_id.employee",
+                days: "$days",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            week: "$_id",
+            employees: 1,
+            _id: 0,
+          },
+        },
+        {
+          $sort: { week: 1 },
+        },
+      ]);
 
-    const salesGeneral = salesByDays.map((resumeWeek) => {
-      const weekSalesByEmployees = salesByEmployees.find(
-        ({ week }) => week === resumeWeek.week
-      );
+      const queryCashflow = {
+        createdAt: {
+          $gte: firstDayOfMonth,
+          $lt: firstDayOfNextMonth,
+        },
+      };
 
-      resumeWeek.salesByEmployees = weekSalesByEmployees.employees.map(
-        (saleByEmployee) => {
-          return {
-            employee: saleByEmployee.employee,
-            sales: weekWithDays[resumeWeek.week].map((day) => {
-              const foundSale = saleByEmployee.days.find((s) => s.date === day);
+      queryCashflow.store = store;
 
-              const weekIncomesByEmployee =
-                cashflowsResumeIncomesByEmployee.find(
+      const cashflowsResumeOutgoings = await Cashflow.aggregate([
+        {
+          $match: {
+            ...queryCashflow,
+            type: "egreso",
+            cancelled: { $ne: true },
+          },
+        },
+        {
+          $project: {
+            id: "$_id",
+            type: 1,
+            amount: 1,
+            store: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$createdAt",
+              },
+            },
+            week: { $isoWeek: "$createdAt" },
+          },
+        },
+        {
+          $group: {
+            _id: { week: "$week", date: "$date" },
+            amount: { $sum: "$amount" },
+          },
+        },
+        {
+          $group: {
+            _id: "$_id.week",
+            days: {
+              $push: {
+                date: "$_id.date",
+                amount: "$amount",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            week: "$_id",
+            days: 1,
+          },
+        },
+        {
+          $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
+        },
+      ]);
+
+      const cashflowsResumeIncomes = await Cashflow.aggregate([
+        {
+          $match: {
+            ...queryCashflow,
+            type: "ingreso",
+            cancelled: { $ne: true },
+            $or: [{ typePayment: { $exists: false } }, { typePayment: "cash" }],
+          },
+        },
+        {
+          $project: {
+            id: "$_id",
+            type: 1,
+            amount: 1,
+            items: 1,
+            store: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$createdAt",
+              },
+            },
+            week: { $isoWeek: "$createdAt" },
+          },
+        },
+        {
+          $group: {
+            _id: { week: "$week", date: "$date" },
+            amount: { $sum: "$amount" },
+            items: { $sum: "$items" },
+          },
+        },
+        {
+          $group: {
+            _id: "$_id.week",
+            days: {
+              $push: {
+                date: "$_id.date",
+                amount: "$amount",
+                items: "$items",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            week: "$_id",
+            days: 1,
+          },
+        },
+        {
+          $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
+        },
+      ]);
+
+      const cashflowsResumeIncomesByEmployee = await Cashflow.aggregate([
+        {
+          $match: {
+            ...queryCashflow,
+            type: "ingreso",
+            cancelled: { $ne: true },
+            $or: [{ typePayment: { $exists: false } }, { typePayment: "cash" }],
+          },
+        },
+        {
+          $project: {
+            id: "$_id",
+            employee: 1,
+            type: 1,
+            amount: 1,
+            items: 1,
+            store: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$createdAt",
+              },
+            },
+            week: { $isoWeek: "$createdAt" },
+          },
+        },
+        {
+          $group: {
+            _id: { week: "$week", date: "$date", employee: "$employee" },
+            amount: { $sum: "$amount" },
+            items: { $sum: "$items" },
+          },
+        },
+        {
+          $group: {
+            _id: { week: "$_id.week", employee: "$_id.employee" },
+            days: {
+              $push: {
+                date: "$_id.date",
+                amount: "$amount",
+                items: "$items",
+              },
+            },
+            totalAmount: { $sum: "$amount" },
+            totalItems: { $sum: "$items" },
+          },
+        },
+        {
+          $group: {
+            _id: "$_id.week",
+            employees: {
+              $push: {
+                employee: "$_id.employee",
+                days: "$days",
+                totalAmount: "$totalAmount",
+                totalItems: "$totalItems",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            week: "$_id",
+            employees: 1,
+            _id: 0,
+          },
+        },
+        {
+          $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
+        },
+      ]);
+
+      const weekWithDays = {};
+
+      salesByDays.forEach((resumeWeek) => {
+        weekWithDays[resumeWeek.week] = resumeWeek.salesGeneral.map(
+          ({ date }) => date
+        );
+      });
+
+      const salesGeneral = salesByDays.map((resumeWeek) => {
+        const weekSalesByEmployees = salesByEmployees.find(
+          ({ week }) => week === resumeWeek.week
+        );
+
+        resumeWeek.salesByEmployees = weekSalesByEmployees.employees
+          .map((saleByEmployee) => {
+            const findDetailFromEmployee = employees.find(
+              (emp) => saleByEmployee.employee === emp.name
+            );
+
+            return {
+              employee: saleByEmployee.employee,
+              position: findDetailFromEmployee
+                ? findDetailFromEmployee.position
+                : employees.length,
+              sales: weekWithDays[resumeWeek.week].map((day) => {
+                const foundSale = saleByEmployee.days.find(
+                  (s) => s.date === day
+                );
+
+                const weekIncomesByEmployee =
+                  cashflowsResumeIncomesByEmployee.find(
+                    (e) => e.week === resumeWeek.week
+                  );
+
+                if (!!weekIncomesByEmployee) {
+                  const foundEmployeeIncome =
+                    weekIncomesByEmployee.employees.find(
+                      (e) => e.employee === saleByEmployee.employee
+                    );
+
+                  if (foundEmployeeIncome) {
+                    const foundDayIncomeByEmployee =
+                      foundEmployeeIncome.days.find((e) => e.date === day);
+
+                    if (foundDayIncomeByEmployee && foundSale) {
+                      foundSale.items =
+                        foundSale.items + (foundDayIncomeByEmployee.items || 0);
+
+                      foundSale.cash =
+                        foundSale.cash + foundDayIncomeByEmployee.amount;
+                    }
+                  }
+                }
+
+                const weekOrdersByEmployee = ordersByEmployees.find(
                   (e) => e.week === resumeWeek.week
                 );
 
-              if (!!weekIncomesByEmployee && typeSale === "local") {
-                const foundEmployeeIncome =
-                  weekIncomesByEmployee.employees.find(
+                if (!!weekOrdersByEmployee) {
+                  const foundEmployee = weekOrdersByEmployee.employees.find(
                     (e) => e.employee === saleByEmployee.employee
                   );
 
-                if (foundEmployeeIncome) {
-                  const foundDayIncomeByEmployee =
-                    foundEmployeeIncome.days.find((e) => e.date === day);
+                  if (foundEmployee) {
+                    const foundDayByEmployee = foundEmployee.days.find(
+                      (e) => e.date === day
+                    );
 
-                  if (foundDayIncomeByEmployee && foundSale) {
-                    foundSale.items =
-                      foundSale.items + (foundDayIncomeByEmployee.items || 0);
+                    if (foundDayByEmployee && foundSale) {
+                      foundSale.items =
+                        foundSale.items + (foundDayByEmployee.items || 0);
 
-                    foundSale.total =
-                      foundSale.total + foundDayIncomeByEmployee.amount;
+                      foundSale.cash = foundSale.cash + foundDayByEmployee.cash;
+                    }
                   }
                 }
-              }
 
-              return (
-                foundSale || {
-                  date: day,
-                  items: 0,
-                  cash: 0,
-                  transfer: 0,
-                  total: 0,
+                const weekOrdersWithPrepaidByEmployee =
+                  ordersWithPrepaidByEmployees.find(
+                    (e) => e.week === resumeWeek.week
+                  );
+
+                if (!!weekOrdersWithPrepaidByEmployee) {
+                  const foundEmployee =
+                    weekOrdersWithPrepaidByEmployee.employees.find(
+                      (e) => e.employee === saleByEmployee.employee
+                    );
+
+                  if (foundEmployee) {
+                    const foundDayByEmployee = foundEmployee.days.find(
+                      (e) => e.date === day
+                    );
+
+                    if (foundDayByEmployee && foundSale) {
+                      foundSale.items =
+                        foundSale.items + (foundDayByEmployee.items || 0);
+
+                      foundSale.cash = foundSale.cash + foundDayByEmployee.cash;
+                    }
+                  }
                 }
-              );
-            }),
-          };
-        }
-      );
 
-      const cashflowByWeekOutgoing = cashflowsResumeOutgoings.find(
-        (cashflow) => cashflow.week === resumeWeek.week
-      );
-      const cashflowByWeekIncome = cashflowsResumeIncomes.find(
-        (cashflow) => cashflow.week === resumeWeek.week
-      );
-
-      resumeWeek.salesGeneral.map((sale) => {
-        sale.totalBox = sale.total;
-
-        if (cashflowByWeekIncome && typeSale === "local") {
-          const cashflowByDay = cashflowByWeekIncome.days.find(
-            (cashflow) => cashflow.date === sale.date
+                return (
+                  foundSale || {
+                    date: day,
+                    items: 0,
+                    cash: 0,
+                    transfer: 0,
+                    total: 0,
+                  }
+                );
+              }),
+            };
+          })
+          .sort(
+            (a, b) =>
+              (a.position || employees.length + 1) -
+              (b.position || employees.length + 1)
           );
 
-          if (cashflowByDay) {
-            sale.items = sale.items + (cashflowByDay.items || 0);
-            sale.total = sale.total + cashflowByDay.amount;
-          }
-        }
+        //Maneja Ingreso Total Diario
+        const cashflowByWeekIncome = cashflowsResumeIncomes.find(
+          (cashflow) => cashflow.week === resumeWeek.week
+        );
 
-        if (cashflowByWeekOutgoing) {
-          const cashflowByDay = cashflowByWeekOutgoing.days.find(
-            (cashflow) => cashflow.date === sale.date
-          );
-          if (cashflowByDay) {
-            sale.outgoings = cashflowByDay.amount;
-            sale.totalBox = sale.total - cashflowByDay.amount;
-          }
-        }
+        const ordersByWeek = ordersByDays.find(
+          (order) => order.week === resumeWeek.week
+        );
 
-        return sale;
+        const ordersWithPrepaidByWeek = ordersWithPrepaid.find(
+          (order) => order.week === resumeWeek.week
+        );
+
+        //Maneja Egresos Total Diario
+        const cashflowByWeekOutgoing = cashflowsResumeOutgoings.find(
+          (cashflow) => cashflow.week === resumeWeek.week
+        );
+
+        resumeWeek.salesGeneral.map((sale) => {
+          sale.totalBox = sale.cash;
+
+          if (cashflowByWeekIncome) {
+            const cashflowByDay = cashflowByWeekIncome.days.find(
+              (cashflow) => cashflow.date === sale.date
+            );
+
+            if (cashflowByDay) {
+              sale.items = sale.items + (cashflowByDay.items || 0);
+              sale.cash = sale.cash + cashflowByDay.amount;
+            }
+          }
+
+          if (ordersByWeek) {
+            const orderByDay = ordersByWeek.salesGeneral.find(
+              (order) => order.date === sale.date
+            );
+
+            if (orderByDay) {
+              sale.items = sale.items + (orderByDay.items || 0);
+              sale.cash = sale.cash + orderByDay.cash;
+            }
+          }
+
+          if (ordersWithPrepaidByWeek) {
+            const orderByDay = ordersWithPrepaidByWeek.salesGeneral.find(
+              (order) => order.date === sale.date
+            );
+
+            if (orderByDay) {
+              sale.items = sale.items + (orderByDay.items || 0);
+              sale.cash = sale.cash + orderByDay.cash;
+            }
+          }
+
+          if (cashflowByWeekOutgoing) {
+            const cashflowByDay = cashflowByWeekOutgoing.days.find(
+              (cashflow) => cashflow.date === sale.date
+            );
+            if (cashflowByDay) {
+              sale.outgoings = cashflowByDay.amount;
+              sale.totalBox = sale.cash - cashflowByDay.amount;
+            }
+          }
+
+          return sale;
+        });
+
+        return resumeWeek;
       });
 
-      return resumeWeek;
-    });
+      res.send({
+        results: {
+          salesGeneral,
+          typeSale,
+        },
+      });
+
+      return;
+    }
+
+    if (typeSale === "pedido") {
+      const salesByDays = await Sale.aggregate([
+        {
+          $match: {
+            checkoutDate: {
+              $gte: firstDayOfMonth,
+              $lt: firstDayOfNextMonth,
+            },
+            typeSale: "pedido",
+            store: store,
+            $or: [
+              {
+                $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+              },
+            ],
+            cancelled: { $ne: true },
+          },
+        },
+        {
+          $project: {
+            id: "$_id",
+            order: 1,
+            employee: 1,
+            cash: "$cash",
+            transfer: "$transfer",
+            items: 1,
+            total: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$checkoutDate",
+              },
+            },
+            week: { $isoWeek: "$checkoutDate" },
+          },
+        },
+        {
+          $group: {
+            _id: { week: "$week", date: "$date" },
+            items: { $sum: "$items" },
+            cash: { $sum: "$cash" },
+            transfer: { $sum: "$transfer" },
+            total: { $sum: "$total" },
+          },
+        },
+        {
+          $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
+        },
+        {
+          $group: {
+            _id: "$_id.week",
+            salesGeneral: {
+              $push: {
+                date: "$_id.date",
+                items: "$items",
+                cash: "$cash",
+                transfer: "$transfer",
+                total: "$total",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            week: "$_id",
+            salesGeneral: 1,
+          },
+        },
+        {
+          $sort: { week: 1 }, // Opcional: ordenar por semana ascendente
+        },
+      ]);
+
+      const salesByEmployees = await Sale.aggregate([
+        {
+          $match: {
+            checkoutDate: {
+              $gte: firstDayOfMonth,
+              $lt: firstDayOfNextMonth,
+            },
+            typeSale: "pedido",
+            store: store,
+            $or: [
+              {
+                $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+              },
+            ],
+            cancelled: { $ne: true },
+          },
+        },
+        {
+          $project: {
+            id: "$_id",
+            order: 1,
+            employee: 1,
+            cash: 1,
+            transfer: 1,
+            items: 1,
+            total: 1,
+            _id: 0,
+            date: {
+              $dateToString: {
+                format: "%d/%m/%Y",
+                date: "$checkoutDate",
+              },
+            },
+            week: { $isoWeek: "$checkoutDate" },
+          },
+        },
+        {
+          $group: {
+            _id: { week: "$week", date: "$date", employee: "$employee" },
+            items: { $sum: "$items" },
+            cash: { $sum: "$cash" },
+            transfer: { $sum: "$transfer" },
+            total: { $sum: "$total" },
+          },
+        },
+        {
+          $sort: { "_id.week": 1, "_id.date": 1 }, // Ordenar por semana ascendente y fecha ascendente
+        },
+        {
+          $group: {
+            _id: { week: "$_id.week", employee: "$_id.employee" },
+            days: {
+              $push: {
+                date: "$_id.date",
+                items: "$items",
+                cash: "$cash",
+                transfer: "$transfer",
+                total: "$total",
+              },
+            },
+          },
+        },
+        {
+          $sort: { "_id.employee": 1 }, // Ordenar por empleado ascendente
+        },
+        {
+          $group: {
+            _id: "$_id.week",
+            employees: {
+              $push: {
+                employee: "$_id.employee",
+                days: "$days",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            week: "$_id",
+            employees: 1,
+            _id: 0,
+          },
+        },
+        {
+          $sort: { week: 1 },
+        },
+      ]);
+
+      const weekWithDays = {};
+
+      salesByDays.forEach((resumeWeek) => {
+        weekWithDays[resumeWeek.week] = resumeWeek.salesGeneral.map(
+          ({ date }) => date
+        );
+      });
+
+      const salesGeneral = salesByDays.map((resumeWeek) => {
+        const weekSalesByEmployees = salesByEmployees.find(
+          ({ week }) => week === resumeWeek.week
+        );
+
+        resumeWeek.salesByEmployees = weekSalesByEmployees.employees
+          .map((saleByEmployee) => {
+            const findDetailFromEmployee = employees.find(
+              (emp) => saleByEmployee.employee === emp.name
+            );
+            return {
+              employee: saleByEmployee.employee,
+              position: findDetailFromEmployee.position,
+              sales: weekWithDays[resumeWeek.week].map((day) => {
+                const foundSale = saleByEmployee.days.find(
+                  (s) => s.date === day
+                );
+
+                return (
+                  foundSale || {
+                    date: day,
+                    items: 0,
+                    cash: 0,
+                    transfer: 0,
+                    total: 0,
+                  }
+                );
+              }),
+            };
+          })
+          .sort(
+            (a, b) =>
+              (a.position || employees.length + 1) -
+              (b.position || employees.length + 1)
+          );
+
+        resumeWeek.salesGeneral.map((sale) => {
+          sale.totalBox = sale.total;
+
+          return sale;
+        });
+
+        return resumeWeek;
+      });
+
+      res.send({
+        results: {
+          salesGeneral,
+          typeSale,
+        },
+      });
+
+      return;
+    }
 
     res.send({
-      results: {
-        salesGeneral,
-        typeSale,
-      },
+      results: {},
     });
   } catch (error) {
     console.log(error);
@@ -971,9 +1687,32 @@ Controllers.create = async (req, res) => {
       isWithPrepaid,
     } = req.body;
 
+    let lastNumOrder = numOrder;
+
+    const lastSaleByEmployee = await Sale.findOne({
+      employee: employee,
+      typeSale: "local",
+      $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+      cancelled: { $ne: true },
+    })
+      .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
+      .limit(1);
+
+    if (numOrder === lastSaleByEmployee.order) {
+      const findEmployee = await Employee.findOne({
+        name: seller,
+      });
+
+      lastNumOrder = findEmployee.enableNewNumOrder
+        ? findEmployee.newNumOrder
+        : !lastSaleByEmployee || lastSaleByEmployee.order >= 100
+        ? 1
+        : lastSaleByEmployee.order + 1;
+    }
+
     await Sale.create({
       store,
-      order: numOrder,
+      order: lastNumOrder,
       employee,
       typeSale,
       typeShipment,
