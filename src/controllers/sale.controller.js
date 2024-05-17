@@ -554,7 +554,23 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
       withBackground: true,
     }));
 
-    res.send({ results: [...sales, ...cashflowWrapper] });
+    const employees = await getAllEmployees();
+
+    const joinedSales = [...sales, ...cashflowWrapper]
+      .map((sale) => {
+        const findDetailFromEmployee = employees.find(
+          (emp) => sale.employee === emp.name
+        );
+
+        return { ...sale, position: findDetailFromEmployee.position };
+      })
+      .sort(
+        (a, b) =>
+          (a.position || employees.length + 1) -
+          (b.position || employees.length + 1)
+      );
+
+    res.send({ results: joinedSales });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar sales" });
@@ -586,7 +602,12 @@ Controllers.getReports = async (req, res) => {
       query.$and = [{ checkoutDate: { $exists: false } }];
 
       const salesByDays = await Sale.aggregate([
-        { $match: { ...query, cash: { $gt: 0 } } },
+        {
+          $match: {
+            ...query,
+            $or: [{ cash: { $gt: 0 } }, { transfer: { $gt: 0 } }],
+          },
+        },
         {
           $project: {
             id: "$_id",
@@ -795,7 +816,12 @@ Controllers.getReports = async (req, res) => {
       ]);
 
       const salesByEmployees = await Sale.aggregate([
-        { $match: query },
+        {
+          $match: {
+            ...query,
+            $or: [{ cash: { $gt: 0 } }, { transfer: { $gt: 0 } }],
+          },
+        },
         {
           $project: {
             id: "$_id",
@@ -1383,6 +1409,7 @@ Controllers.getReports = async (req, res) => {
             if (cashflowByDay) {
               sale.items = sale.items + (cashflowByDay.items || 0);
               sale.cash = sale.cash + cashflowByDay.amount;
+              sale.totalBox = sale.cash + cashflowByDay.amount;
             }
           }
 
@@ -1394,6 +1421,7 @@ Controllers.getReports = async (req, res) => {
             if (orderByDay) {
               sale.items = sale.items + (orderByDay.items || 0);
               sale.cash = sale.cash + orderByDay.cash;
+              sale.totalBox = sale.cash + orderByDay.cash;
             }
           }
 
@@ -1405,6 +1433,7 @@ Controllers.getReports = async (req, res) => {
             if (orderByDay) {
               sale.items = sale.items + (orderByDay.items || 0);
               sale.cash = sale.cash + orderByDay.cash;
+              sale.totalBox = sale.cash + orderByDay.cash;
             }
           }
 
@@ -1428,6 +1457,7 @@ Controllers.getReports = async (req, res) => {
         results: {
           salesGeneral,
           typeSale,
+          salesByEmployees,
         },
       });
 
@@ -1698,7 +1728,7 @@ Controllers.create = async (req, res) => {
       .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
       .limit(1);
 
-    if (numOrder === lastSaleByEmployee.order) {
+    if (lastSaleByEmployee && numOrder === lastSaleByEmployee.order) {
       const findEmployee = await Employee.findOne({
         name: seller,
       });
@@ -2277,8 +2307,8 @@ Controllers.print = async (req, res) => {
 
     const formattedData = `${tpl}\n\n\n\n`;
 
-    //const rawCommands = "\x1B\x69";
-    const rawCommands = "\x1B";
+    const rawCommands = "\x1B\x69";
+    //const rawCommands = "\x1B";
     const rawDataToSend = formattedData + rawCommands;
 
     printer.printDirect({
