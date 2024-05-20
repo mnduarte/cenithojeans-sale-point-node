@@ -10,7 +10,7 @@ const Sale = new BaseModel("Sale");
 const Employee = new BaseModel("Employee");
 const Cashflow = new BaseModel("Cashflow");
 
-const printer = require("@woovi/node-printer");
+//const printer = require("@woovi/node-printer");
 
 const getAllEmployees = async (store = "ALL") => {
   const filter = store === "ALL" ? {} : { store };
@@ -2311,7 +2311,7 @@ Controllers.print = async (req, res) => {
     const rawCommands = "\x1B";
     const rawDataToSend = formattedData + rawCommands;
 
-    printer.printDirect({
+    /*printer.printDirect({
       data: rawDataToSend,
       printer: "SAM4S GIANT-100", // Reemplaza con el nombre de tu impresora
       type: "RAW",
@@ -2321,9 +2321,9 @@ Controllers.print = async (req, res) => {
       error: function (err) {
         console.log(err);
       },
-    });
+    });*/
 
-    //console.log(tpl);
+    console.log(tpl);
 
     res.send({ results: "Se imprimio!" });
   } catch (error) {
