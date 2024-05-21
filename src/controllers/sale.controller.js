@@ -1407,9 +1407,11 @@ Controllers.getReports = async (req, res) => {
             );
 
             if (cashflowByDay) {
+              const saleCash = sale.cash;
+
               sale.items = sale.items + (cashflowByDay.items || 0);
-              sale.cash = sale.cash + cashflowByDay.amount;
-              sale.totalBox = sale.cash + cashflowByDay.amount;
+              sale.cash = saleCash + cashflowByDay.amount;
+              sale.totalBox = saleCash + cashflowByDay.amount;
             }
           }
 
@@ -1419,9 +1421,11 @@ Controllers.getReports = async (req, res) => {
             );
 
             if (orderByDay) {
+              const saleCash = sale.cash;
+
               sale.items = sale.items + (orderByDay.items || 0);
-              sale.cash = sale.cash + orderByDay.cash;
-              sale.totalBox = sale.cash + orderByDay.cash;
+              sale.cash = saleCash + orderByDay.cash;
+              sale.totalBox = saleCash + orderByDay.cash;
             }
           }
 
@@ -1431,9 +1435,11 @@ Controllers.getReports = async (req, res) => {
             );
 
             if (orderByDay) {
+              const saleCash = sale.cash;
+
               sale.items = sale.items + (orderByDay.items || 0);
-              sale.cash = sale.cash + orderByDay.cash;
-              sale.totalBox = sale.cash + orderByDay.cash;
+              sale.cash = saleCash + orderByDay.cash;
+              sale.totalBox = saleCash + orderByDay.cash;
             }
           }
 
@@ -1442,8 +1448,10 @@ Controllers.getReports = async (req, res) => {
               (cashflow) => cashflow.date === sale.date
             );
             if (cashflowByDay) {
+              const saleCash = sale.cash;
+
               sale.outgoings = cashflowByDay.amount;
-              sale.totalBox = sale.cash - cashflowByDay.amount;
+              sale.totalBox = saleCash - cashflowByDay.amount;
             }
           }
 
