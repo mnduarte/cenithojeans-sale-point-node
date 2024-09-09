@@ -1652,9 +1652,12 @@ Controllers.getReports = async (req, res) => {
             const findDetailFromEmployee = employees.find(
               (emp) => saleByEmployee.employee === emp.name
             );
+
             return {
               employee: saleByEmployee.employee,
-              position: findDetailFromEmployee.position,
+              position: findDetailFromEmployee
+                ? findDetailFromEmployee.position
+                : 0,
               sales: weekWithDays[resumeWeek.week].map((day) => {
                 const foundSale = saleByEmployee.days.find(
                   (s) => s.date === day
