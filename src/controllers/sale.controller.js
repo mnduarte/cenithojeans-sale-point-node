@@ -1652,9 +1652,12 @@ Controllers.getReports = async (req, res) => {
             const findDetailFromEmployee = employees.find(
               (emp) => saleByEmployee.employee === emp.name
             );
+
             return {
               employee: saleByEmployee.employee,
-              position: findDetailFromEmployee.position,
+              position: findDetailFromEmployee
+                ? findDetailFromEmployee.position
+                : 0,
               sales: weekWithDays[resumeWeek.week].map((day) => {
                 const foundSale = saleByEmployee.days.find(
                   (s) => s.date === day
@@ -2315,8 +2318,8 @@ Controllers.print = async (req, res) => {
 
     const formattedData = `${tpl}\n\n\n\n`;
 
-    //const rawCommands = "\x1B\x69";
-    const rawCommands = "\x1B";
+    const rawCommands = "\x1B\x69";
+    //const rawCommands = "\x1B";
     const rawDataToSend = formattedData + rawCommands;
 
     /*printer.printDirect({
