@@ -317,6 +317,9 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           _id: 0,
         },
       },
+      {
+        $sort: { id: 1 },
+      },
     ]);
 
     const orders = await Sale.aggregate([
