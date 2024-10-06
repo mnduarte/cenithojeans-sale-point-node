@@ -517,6 +517,9 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
           _id: 0,
         },
       },
+      {
+        $sort: { id: 1 },
+      },
     ]);
 
     const cashflows = await Cashflow.aggregate([
@@ -548,6 +551,9 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
           typePayment: 1,
           _id: 0,
         },
+      },
+      {
+        $sort: { id: 1 },
       },
     ]);
 
