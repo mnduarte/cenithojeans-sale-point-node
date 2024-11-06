@@ -7,63 +7,69 @@ const Employee = new BaseModel("Employee");
 
 Controllers.getCosts = async (req, res) => {
   try {
-    const { startDate, endDate, store, employee } = req.query;
+    const { startDate, endDate, employee, typeShipment, checkoutDate } =
+      req.query;
 
-    const addOneDayDate = new Date(
+    const start = new Date(startDate);
+    const end = new Date(
       new Date(endDate).setDate(new Date(endDate).getDate() + 1)
     );
 
     const query = {
       createdAt: {
-        $gte: new Date(startDate),
-        $lt: addOneDayDate,
+        $gte: start,
+        $lt: end,
       },
     };
 
-    // Agregar store a la consulta si está presente
-    if (store) {
-      query.store = store;
+    if (checkoutDate === "with") {
+      query.checkoutDate = { $exists: true, $ne: "" };
+    } else if (checkoutDate === "without") {
+      query.$or = [{ checkoutDate: { $exists: false } }, { checkoutDate: "" }];
     }
 
-    // Agregar employee a la consulta si está presente
     if (employee) {
       query.employee = employee;
     }
 
-    const sales = await Cost.aggregate([
+    if (typeShipment) {
+      query.typeShipment = typeShipment;
+    }
+
+    const costs = await Cost.aggregate([
       { $match: query },
       {
         $project: {
           id: "$_id",
-          store: 1,
-          order: 1,
-          employee: 1,
-          typeSale: 1,
-          typePayment: 1,
-          typeShipment: 1,
-          items: 1,
-          subTotalItems: 1,
-          devolutionItems: 1,
-          subTotalDevolutionItems: 1,
-          percentageToDisccountOrAdd: 1,
-          username: 1,
-          cancelled: 1,
-          total: 1,
           date: {
             $dateToString: {
               format: "%d/%m/%Y",
-              date: "$createdAt",
+              date: "$date",
             },
           },
+          account: 1,
+          numOrder: 1,
+          amount: 1,
+          approved: 1,
+          dateApproved: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$dateApproved",
+            },
+          },
+          employee: 1,
+          customer: 1,
+          typeShipment: 1,
+          checkoutDate: 1, // Keep checkoutDate as a string
           _id: 0,
         },
       },
     ]);
 
-    res.send({ results: sales });
+    res.send({ results: costs });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: "Error al buscar sales" });
+    res.status(500).json({ message: "Error al buscar gastos" });
   }
 };
 
@@ -72,8 +78,9 @@ Controllers.create = async (req, res) => {
     const {
       date,
       account,
+      numOrder,
       amount,
-      approbed,
+      approved,
       dateApproved,
       employee,
       customer,
@@ -84,8 +91,9 @@ Controllers.create = async (req, res) => {
     const newCost = await Cost.create({
       date,
       account,
+      numOrder,
       amount,
-      approbed,
+      approved,
       dateApproved,
       employee,
       customer,
@@ -114,8 +122,9 @@ Controllers.update = async (req, res) => {
       id,
       date,
       account,
+      numOrder,
       amount,
-      approbed,
+      approved,
       dateApproved,
       employee,
       customer,
@@ -128,8 +137,9 @@ Controllers.update = async (req, res) => {
       {
         date,
         account,
+        numOrder,
         amount,
-        approbed,
+        approved,
         dateApproved,
         employee,
         customer,
@@ -146,9 +156,9 @@ Controllers.update = async (req, res) => {
     const transformedResults = {
       ...costToUpdate._doc,
       id: costToUpdate._id,
-      ...(costToUpdate.checkoutDate && {
-        checkoutDate: formatCheckoutDate(costToUpdate.checkoutDate),
-      }),
+      date: formatDate(costToUpdate.date),
+      dateApproved: formatDate(costToUpdate.dateApproved),
+      checkoutDate: formatDate(costToUpdate.checkoutDate),
     };
 
     res.send({

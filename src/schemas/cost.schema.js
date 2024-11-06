@@ -12,10 +12,13 @@ const CostSchema = mongoose.Schema(
     account: {
       type: String,
     },
+    numOrder: {
+      type: String,
+    },
     amount: {
       type: Number,
     },
-    approbed: {
+    approved: {
       type: Boolean,
     },
     dateApproved: {
