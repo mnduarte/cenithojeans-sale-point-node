@@ -41,8 +41,18 @@ function formatCheckoutDate(checkoutDate) {
   return formattedDate;
 }
 
+const formatDate = (date) =>
+  date
+    ? new Date(date).toLocaleDateString("es-ES", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : null;
+
 module.exports = {
   formatCurrency,
   calculateTotalPercentage,
   formatCheckoutDate,
+  formatDate,
 };

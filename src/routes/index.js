@@ -9,6 +9,7 @@ const cashflowRoutes = require("./cashflow.route");
 const observationRoutes = require("./observation.route");
 const graphRoutes = require("./graph.route");
 const adminRoutes = require("./admin.route");
+const costRoutes = require("./cost.route");
 
 /*
 // Función para agregar retraso
@@ -30,5 +31,6 @@ router.use("/cashflow", cashflowRoutes);
 router.use("/observation", observationRoutes);
 router.use("/graph", graphRoutes);
 router.use("/admin", adminRoutes);
+router.use("/cost", costRoutes);
 
 module.exports = router;
