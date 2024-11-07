@@ -41,8 +41,17 @@ function formatCheckoutDate(checkoutDate) {
   return formattedDate;
 }
 
+const formatDate = (date) => {
+  if (!date) return null;
+
+  const [day, month, year] = date.split("/");
+  const formattedDate = new Date(`${year}-${month}-${day}`);
+  return formattedDate;
+};
+
 module.exports = {
   formatCurrency,
   calculateTotalPercentage,
   formatCheckoutDate,
+  formatDate,
 };

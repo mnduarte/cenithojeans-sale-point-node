@@ -10,6 +10,7 @@ const schemas = {
   Cashflow: require("../schemas/cashflow.schema"),
   Observation: require("../schemas/observation.schema"),
   UpdateDB: require("../schemas/update-db.schema"),
+  Cost: require("../schemas/cost.schema"),
 };
 
 class BaseModel {
@@ -25,8 +26,7 @@ class BaseModel {
    * @param {Function} next
    */
   findByIdAndUpdate(id, data) {
-    const cleanedId = sanitize(id);
-    return this.Schema.findByIdAndUpdate(cleanedId, data, { new: true });
+    return this.Schema.findByIdAndUpdate(id, data, { new: true });
   }
 
   /**

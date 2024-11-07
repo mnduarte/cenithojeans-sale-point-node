@@ -1,27 +1,23 @@
-# it-crowd-server
+# GUIDE FOR PRINTER
 
-A server in which you can manage games, also it generates a token that is then used in a middlaware to verify the user status.
+Helguera
+1 086 443 921
+const rawCommands = "\x1B";
 
-## Installation
+1 305 480 885
+const rawCommands = "\x1B\x69";
 
-1. Clone the repository: `git clone https://github.com/mnduarte/it-crowd-server.git`.
-2. Install the dependencies: `npm install`.
-3. Create a `.env.local` file with the project configuration information. You can follow the example of the `.env.example` file.
+Bogota
+885616647 // Caja Nely
+const rawCommands = "\x1B";
 
-## Migrate
+1193239624 // Caja Lety
+const rawCommands = "\x1B\x69";
 
-NoSql mongoDb database is used, it is necessary to have it installed.
+809 404 605 // Caja Angel
+const rawCommands = "\x1B\x69";
 
-- `npm run updatedb`: generate a default user and do a bulk insert of 20000 sets.
+1 173 978 894 // Caja Reserva
+const rawCommands = "\x1B";
 
-## Scripts
-
-- `npm run start:dev`: runs the server in development mode, using `nodemon` and `node-dev`.
-
-## Collection
-
-- You can import the `it-crowd.postman_collection.json` to see all endpoints, it is recommended to start with the Auth/login endpoint execution, extract the token value and add it as environment variable, to have all endpoints available.
-
-## Debug
-
-- You can also run "Launch Node nodemon" to track through breakpoints.
+1727269210 // Luis
