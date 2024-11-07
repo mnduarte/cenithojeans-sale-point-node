@@ -1,9 +1,8 @@
 // @Vendors
 const Controllers = {};
 const BaseModel = require("../models/base.model");
-const { formatCheckoutDate, formatDate } = require("../utils/formatUtils");
+const { formatDate } = require("../utils/formatUtils");
 const Cost = new BaseModel("Cost");
-const Employee = new BaseModel("Employee");
 
 Controllers.getCosts = async (req, res) => {
   try {
@@ -16,16 +15,21 @@ Controllers.getCosts = async (req, res) => {
     );
 
     const query = {
-      createdAt: {
+      date: {
         $gte: start,
         $lt: end,
       },
     };
 
     if (checkoutDate === "with") {
-      query.checkoutDate = { $exists: true, $ne: "" };
-    } else if (checkoutDate === "without") {
-      query.$or = [{ checkoutDate: { $exists: false } }, { checkoutDate: "" }];
+      query.checkoutDate = { $exists: true, $ne: null };
+    }
+
+    if (checkoutDate === "wihtout") {
+      query.$or = [
+        { checkoutDate: { $exists: false } },
+        { checkoutDate: null },
+      ];
     }
 
     if (employee) {
@@ -60,7 +64,12 @@ Controllers.getCosts = async (req, res) => {
           employee: 1,
           customer: 1,
           typeShipment: 1,
-          checkoutDate: 1, // Keep checkoutDate as a string
+          checkoutDate: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$dateApproved",
+            },
+          },
           _id: 0,
         },
       },
@@ -89,24 +98,21 @@ Controllers.create = async (req, res) => {
     } = req.body;
 
     const newCost = await Cost.create({
-      date,
+      date: formatDate(date),
       account,
       numOrder,
       amount,
       approved,
-      dateApproved,
+      dateApproved: formatDate(dateApproved),
       employee,
       customer,
       typeShipment,
-      checkoutDate,
+      checkoutDate: formatDate(checkoutDate),
     });
 
     const transformedResult = {
       ...newCost._doc,
       id: newCost._id,
-      date: formatDate(newCost.date),
-      dateApproved: formatDate(newCost.dateApproved),
-      checkoutDate: formatDate(newCost.checkoutDate),
     };
 
     res.send({ results: transformedResult });
@@ -135,16 +141,16 @@ Controllers.update = async (req, res) => {
     const costToUpdate = await Cost.findByIdAndUpdate(
       id,
       {
-        date,
+        date: formatDate(date),
         account,
         numOrder,
         amount,
         approved,
-        dateApproved,
+        dateApproved: formatDate(dateApproved),
         employee,
         customer,
         typeShipment,
-        checkoutDate,
+        checkoutDate: formatDate(checkoutDate),
       },
       { new: true }
     );
@@ -156,9 +162,6 @@ Controllers.update = async (req, res) => {
     const transformedResults = {
       ...costToUpdate._doc,
       id: costToUpdate._id,
-      date: formatDate(costToUpdate.date),
-      dateApproved: formatDate(costToUpdate.dateApproved),
-      checkoutDate: formatDate(costToUpdate.checkoutDate),
     };
 
     res.send({
@@ -166,6 +169,24 @@ Controllers.update = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Error al modificar orden" });
+  }
+};
+
+Controllers.removeCosts = async (req, res) => {
+  try {
+    const { costsIds } = req.body;
+
+    const idsToDelete = costsIds.map((cost) => cost.id);
+    const query = { _id: { $in: idsToDelete } };
+
+    await Cost.removeMany(query);
+
+    res.send({
+      results: { message: "Datos eliminados correctamente" },
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error when creating the Sale" });
   }
 };
 
