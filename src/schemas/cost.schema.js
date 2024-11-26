@@ -34,6 +34,12 @@ const CostSchema = mongoose.Schema(
       type: String,
     },
     checkoutDate: {
+      type: Date,
+    },
+    items: {
+      type: Number,
+    },
+    store: {
       type: String,
     },
   },

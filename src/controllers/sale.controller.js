@@ -9,6 +9,7 @@ const {
 const Sale = new BaseModel("Sale");
 const Employee = new BaseModel("Employee");
 const Cashflow = new BaseModel("Cashflow");
+const Cost = new BaseModel("Cost");
 
 //const printer = require("@woovi/node-printer");
 
@@ -167,6 +168,7 @@ Controllers.getOrders = async (req, res) => {
               date: "$checkoutDate",
             },
           },
+          approved: 1,
           date: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -226,6 +228,7 @@ Controllers.getOrdersCheckoutDate = async (req, res) => {
           username: 1,
           total: 1,
           cancelled: 1,
+          approved: 1,
           checkoutDate: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -1794,7 +1797,7 @@ Controllers.createSaleByEmployee = async (req, res) => {
       $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
       cancelled: { $ne: true },
     })
-      .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
+      .sort({ createdAt: -1 })
       .limit(1);
 
     const findEmployee = await Employee.findOne({
@@ -1856,6 +1859,22 @@ Controllers.updateOrder = async (req, res) => {
     }
 
     await saleToUpdate.save();
+
+    /** UPDATE COST */
+    if (dataIndex === "checkoutDate") {
+      await Cost.updateMany(
+        {
+          numOrder: saleToUpdate.order,
+          employee: saleToUpdate.employee,
+        },
+        {
+          $set: {
+            checkoutDate: value,
+            typeShipment: saleToUpdate.typeShipment,
+          },
+        }
+      );
+    }
 
     const transformedResults = {
       ...saleToUpdate._doc,

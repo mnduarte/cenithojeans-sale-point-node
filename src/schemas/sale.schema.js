@@ -63,6 +63,9 @@ const SaleSchema = mongoose.Schema(
     isWithPrepaid: {
       type: Boolean,
     },
+    approved: {
+      type: Boolean,
+    },
   },
   {
     timestamps: {

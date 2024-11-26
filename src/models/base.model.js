@@ -11,6 +11,7 @@ const schemas = {
   Observation: require("../schemas/observation.schema"),
   UpdateDB: require("../schemas/update-db.schema"),
   Cost: require("../schemas/cost.schema"),
+  Account: require("../schemas/account.schema"),
 };
 
 class BaseModel {
