@@ -48,6 +48,9 @@ const SaleSchema = mongoose.Schema(
     username: {
       type: String,
     },
+    statusRelatedToCost: {
+      type: String,
+    },
     total: {
       type: Number,
     },
@@ -61,6 +64,9 @@ const SaleSchema = mongoose.Schema(
       type: Boolean,
     },
     isWithPrepaid: {
+      type: Boolean,
+    },
+    approved: {
       type: Boolean,
     },
   },

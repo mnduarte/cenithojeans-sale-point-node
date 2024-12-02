@@ -9,8 +9,13 @@ const {
 const Sale = new BaseModel("Sale");
 const Employee = new BaseModel("Employee");
 const Cashflow = new BaseModel("Cashflow");
+const Cost = new BaseModel("Cost");
 
-const printer = require("@woovi/node-printer");
+//const printer = require("@woovi/node-printer");
+
+const now = new Date();
+const fifteenDaysAgo = new Date();
+fifteenDaysAgo.setDate(now.getDate() - 15);
 
 const getAllEmployees = async (store = "ALL") => {
   const filter = store === "ALL" ? {} : { store };
@@ -167,6 +172,8 @@ Controllers.getOrders = async (req, res) => {
               date: "$checkoutDate",
             },
           },
+          approved: 1,
+          statusRelatedToCost: 1,
           date: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -178,7 +185,7 @@ Controllers.getOrders = async (req, res) => {
       },
     ]);
 
-    res.send({ results: orders });
+    res.send({ results: orders.map((order) => ({ ...order })) });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar ordenes" });
@@ -187,7 +194,8 @@ Controllers.getOrders = async (req, res) => {
 
 Controllers.getOrdersCheckoutDate = async (req, res) => {
   try {
-    const { startDate, endDate, typeSale, store, typeShipment } = req.query;
+    const { startDate, endDate, typeSale, store, employee, typeShipment } =
+      req.query;
 
     const addOneDayDate = new Date(
       new Date(endDate).setDate(new Date(endDate).getDate() + 1)
@@ -208,6 +216,10 @@ Controllers.getOrdersCheckoutDate = async (req, res) => {
       query.typeShipment = typeShipment;
     }
 
+    if (employee) {
+      query.employee = employee;
+    }
+
     query.typeSale = typeSale;
 
     const orders = await Sale.aggregate([
@@ -226,6 +238,7 @@ Controllers.getOrdersCheckoutDate = async (req, res) => {
           username: 1,
           total: 1,
           cancelled: 1,
+          approved: 1,
           checkoutDate: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -1794,7 +1807,7 @@ Controllers.createSaleByEmployee = async (req, res) => {
       $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
       cancelled: { $ne: true },
     })
-      .sort({ createdAt: -1 }) // Ordenar por createdAt en orden descendente
+      .sort({ createdAt: -1 })
       .limit(1);
 
     const findEmployee = await Employee.findOne({
@@ -1855,7 +1868,78 @@ Controllers.updateOrder = async (req, res) => {
       saleToUpdate.total = saleToUpdate.cash + value;
     }
 
+    if (["transfer", "cash"].includes(dataIndex)) {
+      const costs = await Cost.find(
+        {
+          numOrder: saleToUpdate.order,
+          employee: saleToUpdate.employee,
+          createdAt: { $gte: fifteenDaysAgo },
+        },
+        {
+          approved: 1,
+          amount: 1,
+        }
+      );
+
+      let totalAmount = 0;
+      let allApproved = true;
+
+      for (const cost of costs) {
+        totalAmount += cost.amount;
+      }
+
+      for (const cost of costs) {
+        if (!cost.approved) {
+          allApproved = false;
+          break;
+        }
+      }
+
+      const isApproved = totalAmount >= saleToUpdate.transfer && allApproved;
+
+      saleToUpdate.approved = isApproved;
+
+      saleToUpdate.statusRelatedToCost =
+        Boolean(totalAmount) && saleToUpdate.transfer > totalAmount
+          ? "partialPayment"
+          : isApproved && !Boolean(saleToUpdate.cash)
+          ? "approved"
+          : isApproved && Boolean(saleToUpdate.cash)
+          ? "approvedHasCash"
+          : "withoutPayment";
+    }
+
     await saleToUpdate.save();
+
+    /** UPDATE COST */
+    if (dataIndex === "items") {
+      await Cost.updateMany(
+        {
+          numOrder: saleToUpdate.order,
+          employee: saleToUpdate.employee,
+        },
+        {
+          $set: {
+            items: value,
+          },
+        }
+      );
+    }
+
+    if (dataIndex === "checkoutDate") {
+      await Cost.updateMany(
+        {
+          numOrder: saleToUpdate.order,
+          employee: saleToUpdate.employee,
+        },
+        {
+          $set: {
+            checkoutDate: value,
+            typeShipment: saleToUpdate.typeShipment,
+          },
+        }
+      );
+    }
 
     const transformedResults = {
       ...saleToUpdate._doc,
@@ -2331,7 +2415,7 @@ Controllers.print = async (req, res) => {
     //const rawCommands = "\x1B";
     const rawDataToSend = formattedData + rawCommands;
 
-    printer.printDirect({
+    /*printer.printDirect({
       data: rawDataToSend,
       printer: "SAM4S GIANT-100", // Reemplaza con el nombre de tu impresora
       type: "RAW",
@@ -2341,9 +2425,9 @@ Controllers.print = async (req, res) => {
       error: function (err) {
         console.log(err);
       },
-    });
+    });*/
 
-    //console.log(tpl);
+    console.log(tpl);
 
     res.send({ results: "Se imprimio!" });
   } catch (error) {
