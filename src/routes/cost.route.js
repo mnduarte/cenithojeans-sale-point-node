@@ -3,6 +3,7 @@ const router = express.Router();
 const { Controllers } = require("../controllers/cost.controller");
 
 router.get("/costs", Controllers.getCosts);
+router.get("/costs-by-date-approved", Controllers.getCostsByDateApproved);
 router.post("/add-cost", Controllers.create);
 router.put("/update-cost", Controllers.update);
 router.post("/remove-cost", Controllers.removeCosts);

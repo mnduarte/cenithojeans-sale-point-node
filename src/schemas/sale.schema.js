@@ -48,6 +48,9 @@ const SaleSchema = mongoose.Schema(
     username: {
       type: String,
     },
+    statusRelatedToCost: {
+      type: String,
+    },
     total: {
       type: Number,
     },

@@ -42,6 +42,9 @@ const CostSchema = mongoose.Schema(
     store: {
       type: String,
     },
+    linkedOnOrder: {
+      type: Boolean,
+    },
   },
   {
     timestamps: {

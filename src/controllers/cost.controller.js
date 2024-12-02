@@ -6,6 +6,25 @@ const Sale = new BaseModel("Sale");
 const Cost = new BaseModel("Cost");
 const Account = new BaseModel("Account");
 
+const adjustItemsForCosts = (costs) => {
+  const seenGroups = new Set();
+
+  return costs.map((cost) => {
+    const groupKey = `${cost.numOrder}-${cost.employee || "null"}`;
+
+    if (seenGroups.has(groupKey)) {
+      return { ...cost, items: null };
+    }
+
+    seenGroups.add(groupKey);
+    return cost;
+  });
+};
+
+const now = new Date();
+const fifteenDaysAgo = new Date();
+fifteenDaysAgo.setDate(now.getDate() - 15);
+
 Controllers.getCosts = async (req, res) => {
   try {
     const {
@@ -83,6 +102,7 @@ Controllers.getCosts = async (req, res) => {
           typeShipment: 1,
           items: 1,
           store: 1,
+          linkedOnOrder: 1,
           checkoutDate: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -92,9 +112,76 @@ Controllers.getCosts = async (req, res) => {
           _id: 0,
         },
       },
+      { $sort: { numOrder: 1, employee: 1 } },
     ]);
 
-    res.send({ results: costs });
+    const updatedCostsForItems = adjustItemsForCosts(costs);
+
+    res.send({ results: updatedCostsForItems });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error al buscar gastos" });
+  }
+};
+
+Controllers.getCostsByDateApproved = async (req, res) => {
+  try {
+    const { dateApproved } = req.query;
+
+    const start = new Date(dateApproved);
+    const end = new Date(
+      new Date(dateApproved).setDate(new Date(dateApproved).getDate() + 1)
+    );
+
+    const query = {
+      dateApproved: {
+        $gte: start,
+        $lt: end,
+      },
+    };
+
+    const costs = await Cost.aggregate([
+      { $match: query },
+      {
+        $project: {
+          id: "$_id",
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$date",
+            },
+          },
+          account: 1,
+          numOrder: 1,
+          amount: 1,
+          approved: 1,
+          dateApproved: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$dateApproved",
+            },
+          },
+          employee: 1,
+          customer: 1,
+          typeShipment: 1,
+          items: 1,
+          store: 1,
+          linkedOnOrder: 1,
+          checkoutDate: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$checkoutDate",
+            },
+          },
+          _id: 0,
+        },
+      },
+      { $sort: { numOrder: 1, employee: 1 } },
+    ]);
+
+    const updatedCostsForItems = adjustItemsForCosts(costs);
+
+    res.send({ results: updatedCostsForItems });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar gastos" });
@@ -132,10 +219,14 @@ Controllers.create = async (req, res) => {
     const order = await Sale.findOne({
       order: numOrder,
       employee,
+      checkoutDate: null,
     });
 
-    propsCost.items = order ? order.items : null;
-    propsCost.store = order ? order.store : null;
+    if (order) {
+      propsCost.items = order ? order.items : null;
+      propsCost.store = order ? order.store : null;
+      propsCost.linkedOnOrder = true;
+    }
 
     const newCost = await Cost.create(propsCost);
 
@@ -145,30 +236,49 @@ Controllers.create = async (req, res) => {
     };
 
     /* ACTUALIZA ORDEN */
-    const costs = await Cost.find(
-      {
-        numOrder,
-        employee,
-      },
-      {
-        approved: 1,
-        amount: 1,
-      }
-    );
 
-    let totalAmount = 0;
-    let allApproved = true;
+    if (order) {
+      const costs = await Cost.find(
+        {
+          numOrder,
+          employee,
+          createdAt: { $gte: fifteenDaysAgo },
+        },
+        {
+          approved: 1,
+          amount: 1,
+        }
+      );
 
-    for (const cost of costs) {
-      if (!cost.approved) {
-        allApproved = false;
-        break;
+      let totalAmount = 0;
+      let allApproved = true;
+
+      for (const cost of costs) {
+        totalAmount += cost.amount;
       }
-      totalAmount += cost.amount;
+
+      for (const cost of costs) {
+        if (!cost.approved) {
+          allApproved = false;
+          break;
+        }
+      }
+
+      const isApproved = order && totalAmount >= order.transfer && allApproved;
+
+      order.approved = isApproved;
+
+      order.statusRelatedToCost =
+        Boolean(totalAmount) && order.transfer > totalAmount
+          ? "partialPayment"
+          : isApproved && !Boolean(order.cash)
+          ? "approved"
+          : isApproved && Boolean(order.cash)
+          ? "approvedHasCash"
+          : "withoutPayment";
+
+      await order.save();
     }
-
-    order.approved = order && totalAmount >= order.transfer && allApproved;
-    await order.save();
 
     res.send({ results: transformedResult });
   } catch (error) {
@@ -209,10 +319,14 @@ Controllers.update = async (req, res) => {
     const order = await Sale.findOne({
       order: numOrder,
       employee,
+      checkoutDate: null,
     });
 
-    propsCost.items = order ? order.items : null;
-    propsCost.store = order ? order.store : null;
+    if (order) {
+      propsCost.items = order ? order.items : null;
+      propsCost.store = order ? order.store : null;
+      propsCost.linkedOnOrder = true;
+    }
 
     const costToUpdate = await Cost.findByIdAndUpdate(id, propsCost, {
       new: true,
@@ -228,30 +342,48 @@ Controllers.update = async (req, res) => {
     };
 
     /* ACTUALIZA ORDEN */
-    const costs = await Cost.find(
-      {
-        numOrder,
-        employee,
-      },
-      {
-        approved: 1,
-        amount: 1,
-      }
-    );
+    if (order) {
+      const costs = await Cost.find(
+        {
+          numOrder,
+          employee,
+          createdAt: { $gte: fifteenDaysAgo },
+        },
+        {
+          approved: 1,
+          amount: 1,
+        }
+      );
 
-    let totalAmount = 0;
-    let allApproved = true;
+      let totalAmount = 0;
+      let allApproved = true;
 
-    for (const cost of costs) {
-      if (!cost.approved) {
-        allApproved = false;
-        break;
+      for (const cost of costs) {
+        totalAmount += cost.amount;
       }
-      totalAmount += cost.amount;
+
+      for (const cost of costs) {
+        if (!cost.approved) {
+          allApproved = false;
+          break;
+        }
+      }
+
+      const isApproved = order && totalAmount >= order.transfer && allApproved;
+
+      order.approved = isApproved;
+
+      order.statusRelatedToCost =
+        Boolean(totalAmount) && order.transfer > totalAmount
+          ? "partialPayment"
+          : isApproved && !Boolean(order.cash)
+          ? "approved"
+          : isApproved && Boolean(order.cash)
+          ? "approvedHasCash"
+          : "withoutPayment";
+
+      await order.save();
     }
-
-    order.approved = order && totalAmount >= order.transfer && allApproved;
-    await order.save();
 
     res.send({
       results: transformedResults,
