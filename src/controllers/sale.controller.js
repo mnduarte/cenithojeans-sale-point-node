@@ -180,7 +180,7 @@ Controllers.getOrders = async (req, res) => {
               date: "$createdAt",
             },
           },
-          _id: 0,
+          _id: 1,
         },
       },
     ]);
@@ -1912,7 +1912,7 @@ Controllers.updateOrder = async (req, res) => {
     await saleToUpdate.save();
 
     /** UPDATE COST */
-    if (dataIndex === "items") {
+    if (["checkoutDate", "items", "typeShipment"].includes(dataIndex)) {
       await Cost.updateMany(
         {
           numOrder: saleToUpdate.order,
@@ -1920,21 +1920,8 @@ Controllers.updateOrder = async (req, res) => {
         },
         {
           $set: {
-            items: value,
-          },
-        }
-      );
-    }
-
-    if (dataIndex === "checkoutDate") {
-      await Cost.updateMany(
-        {
-          numOrder: saleToUpdate.order,
-          employee: saleToUpdate.employee,
-        },
-        {
-          $set: {
-            checkoutDate: value,
+            checkoutDate: saleToUpdate.checkoutDate,
+            items: saleToUpdate.items,
             typeShipment: saleToUpdate.typeShipment,
           },
         }

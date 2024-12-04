@@ -219,14 +219,15 @@ Controllers.create = async (req, res) => {
     const order = await Sale.findOne({
       order: numOrder,
       employee,
-      checkoutDate: null,
+      typeSale: "pedido",
+      createdAt: { $gte: fifteenDaysAgo },
     });
 
-    if (order) {
-      propsCost.items = order ? order.items : null;
-      propsCost.store = order ? order.store : null;
-      propsCost.linkedOnOrder = true;
-    }
+    propsCost.items = Boolean(order) ? order.items : null;
+    propsCost.checkoutDate = Boolean(order) ? order.checkoutDate : null;
+    propsCost.typeShipment = Boolean(order) ? order.typeShipment : null;
+    propsCost.store = Boolean(order) ? order.store : null;
+    propsCost.linkedOnOrder = Boolean(order);
 
     const newCost = await Cost.create(propsCost);
 
@@ -319,14 +320,15 @@ Controllers.update = async (req, res) => {
     const order = await Sale.findOne({
       order: numOrder,
       employee,
-      checkoutDate: null,
+      typeSale: "pedido",
+      createdAt: { $gte: fifteenDaysAgo },
     });
 
-    if (order) {
-      propsCost.items = order ? order.items : null;
-      propsCost.store = order ? order.store : null;
-      propsCost.linkedOnOrder = true;
-    }
+    propsCost.items = Boolean(order) ? order.items : null;
+    propsCost.checkoutDate = Boolean(order) ? order.checkoutDate : null;
+    propsCost.typeShipment = Boolean(order) ? order.typeShipment : null;
+    propsCost.store = Boolean(order) ? order.store : null;
+    propsCost.linkedOnOrder = Boolean(order);
 
     const costToUpdate = await Cost.findByIdAndUpdate(id, propsCost, {
       new: true,
@@ -399,6 +401,35 @@ Controllers.removeCosts = async (req, res) => {
 
     const idsToDelete = costsIds.map((cost) => cost.id);
     const query = { _id: { $in: idsToDelete } };
+
+    const costs = await Cost.aggregate([
+      { $match: query },
+      {
+        $project: {
+          numOrder: 1,
+          employee: 1,
+          items: 1,
+          store: 1,
+        },
+      },
+    ]);
+
+    const { numOrder, employee, items, store } = costs[0];
+
+    const order = await Sale.findOne({
+      order: numOrder,
+      employee,
+      items,
+      store,
+      typeSale: "pedido",
+      createdAt: { $gte: fifteenDaysAgo },
+    });
+
+    if (order) {
+      order.statusRelatedToCost = null;
+
+      await order.save();
+    }
 
     await Cost.removeMany(query);
 
