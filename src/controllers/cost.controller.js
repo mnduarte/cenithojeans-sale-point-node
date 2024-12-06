@@ -73,7 +73,7 @@ Controllers.getCosts = async (req, res) => {
     }
 
     if (store) {
-      query.store = store;
+      query.$or = [{ store: store }, { store: null }];
     }
 
     const costs = await Cost.aggregate([
@@ -126,7 +126,7 @@ Controllers.getCosts = async (req, res) => {
 
 Controllers.getCostsByDateApproved = async (req, res) => {
   try {
-    const { dateApproved } = req.query;
+    const { dateApproved, store } = req.query;
 
     const start = new Date(dateApproved);
     const end = new Date(
@@ -139,6 +139,10 @@ Controllers.getCostsByDateApproved = async (req, res) => {
         $lt: end,
       },
     };
+
+    if (store) {
+      query.$or = [{ store: store }, { store: null }];
+    }
 
     const costs = await Cost.aggregate([
       { $match: query },
@@ -224,8 +228,8 @@ Controllers.create = async (req, res) => {
     });
 
     propsCost.items = Boolean(order) ? order.items : null;
-    propsCost.checkoutDate = Boolean(order) ? order.checkoutDate : null;
-    propsCost.typeShipment = Boolean(order) ? order.typeShipment : null;
+    propsCost.checkoutDate = Boolean(order) ? order.checkoutDate : checkoutDate;
+    propsCost.typeShipment = Boolean(order) ? order.typeShipment : typeShipment;
     propsCost.store = Boolean(order) ? order.store : null;
     propsCost.linkedOnOrder = Boolean(order);
 
@@ -269,14 +273,20 @@ Controllers.create = async (req, res) => {
 
       order.approved = isApproved;
 
-      order.statusRelatedToCost =
-        Boolean(totalAmount) && order.transfer > totalAmount
-          ? "partialPayment"
-          : isApproved && !Boolean(order.cash)
-          ? "approved"
-          : isApproved && Boolean(order.cash)
-          ? "approvedHasCash"
-          : "withoutPayment";
+      if (order.transfer) {
+        order.statusRelatedToCost =
+          Boolean(totalAmount) && order.transfer > totalAmount
+            ? "partialPayment"
+            : isApproved && !Boolean(order.cash)
+            ? "approved"
+            : isApproved && Boolean(order.cash)
+            ? "approvedHasCash"
+            : "withoutPayment";
+      }
+
+      if (!order.transfer) {
+        order.statusRelatedToCost = null;
+      }
 
       await order.save();
     }
@@ -325,8 +335,8 @@ Controllers.update = async (req, res) => {
     });
 
     propsCost.items = Boolean(order) ? order.items : null;
-    propsCost.checkoutDate = Boolean(order) ? order.checkoutDate : null;
-    propsCost.typeShipment = Boolean(order) ? order.typeShipment : null;
+    propsCost.checkoutDate = Boolean(order) ? order.checkoutDate : checkoutDate;
+    propsCost.typeShipment = Boolean(order) ? order.typeShipment : typeShipment;
     propsCost.store = Boolean(order) ? order.store : null;
     propsCost.linkedOnOrder = Boolean(order);
 
@@ -375,14 +385,20 @@ Controllers.update = async (req, res) => {
 
       order.approved = isApproved;
 
-      order.statusRelatedToCost =
-        Boolean(totalAmount) && order.transfer > totalAmount
-          ? "partialPayment"
-          : isApproved && !Boolean(order.cash)
-          ? "approved"
-          : isApproved && Boolean(order.cash)
-          ? "approvedHasCash"
-          : "withoutPayment";
+      if (order.transfer) {
+        order.statusRelatedToCost =
+          Boolean(totalAmount) && order.transfer > totalAmount
+            ? "partialPayment"
+            : isApproved && !Boolean(order.cash)
+            ? "approved"
+            : isApproved && Boolean(order.cash)
+            ? "approvedHasCash"
+            : "withoutPayment";
+      }
+
+      if (!order.transfer) {
+        order.statusRelatedToCost = null;
+      }
 
       await order.save();
     }

@@ -1899,14 +1899,20 @@ Controllers.updateOrder = async (req, res) => {
 
       saleToUpdate.approved = isApproved;
 
-      saleToUpdate.statusRelatedToCost =
-        Boolean(totalAmount) && saleToUpdate.transfer > totalAmount
-          ? "partialPayment"
-          : isApproved && !Boolean(saleToUpdate.cash)
-          ? "approved"
-          : isApproved && Boolean(saleToUpdate.cash)
-          ? "approvedHasCash"
-          : "withoutPayment";
+      if (saleToUpdate.transfer) {
+        saleToUpdate.statusRelatedToCost =
+          Boolean(totalAmount) && saleToUpdate.transfer > totalAmount
+            ? "partialPayment"
+            : isApproved && !Boolean(saleToUpdate.cash)
+            ? "approved"
+            : isApproved && Boolean(saleToUpdate.cash)
+            ? "approvedHasCash"
+            : "withoutPayment";
+      }
+
+      if (!saleToUpdate.transfer) {
+        saleToUpdate.statusRelatedToCost = null;
+      }
     }
 
     await saleToUpdate.save();
