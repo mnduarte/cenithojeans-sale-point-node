@@ -5,6 +5,7 @@ const { formatDate } = require("../utils/formatUtils");
 const Sale = new BaseModel("Sale");
 const Cost = new BaseModel("Cost");
 const Account = new BaseModel("Account");
+const Employee = new BaseModel("Employee");
 
 const adjustItemsForCosts = (costs) => {
   const seenGroups = new Set();
@@ -227,10 +228,17 @@ Controllers.create = async (req, res) => {
       createdAt: { $gte: fifteenDaysAgo },
     });
 
+    let dataEmployee = {};
+    if (!order && employee) {
+      dataEmployee = await Employee.findOne({
+        name: employee,
+      });
+    }
+
     propsCost.items = Boolean(order) ? order.items : null;
     propsCost.checkoutDate = Boolean(order) ? order.checkoutDate : checkoutDate;
     propsCost.typeShipment = Boolean(order) ? order.typeShipment : typeShipment;
-    propsCost.store = Boolean(order) ? order.store : null;
+    propsCost.store = Boolean(order) ? order.store : dataEmployee.store || null;
     propsCost.linkedOnOrder = Boolean(order);
 
     const newCost = await Cost.create(propsCost);
@@ -334,10 +342,17 @@ Controllers.update = async (req, res) => {
       createdAt: { $gte: fifteenDaysAgo },
     });
 
+    let dataEmployee = {};
+    if (!order && employee) {
+      dataEmployee = await Employee.findOne({
+        name: employee,
+      });
+    }
+
     propsCost.items = Boolean(order) ? order.items : null;
     propsCost.checkoutDate = Boolean(order) ? order.checkoutDate : checkoutDate;
     propsCost.typeShipment = Boolean(order) ? order.typeShipment : typeShipment;
-    propsCost.store = Boolean(order) ? order.store : null;
+    propsCost.store = Boolean(order) ? order.store : dataEmployee.store || null;
     propsCost.linkedOnOrder = Boolean(order);
 
     const costToUpdate = await Cost.findByIdAndUpdate(id, propsCost, {
