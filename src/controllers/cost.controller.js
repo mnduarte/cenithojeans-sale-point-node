@@ -113,7 +113,6 @@ Controllers.getCosts = async (req, res) => {
           _id: 0,
         },
       },
-      { $sort: { numOrder: 1, employee: 1 } },
     ]);
 
     const updatedCostsForItems = adjustItemsForCosts(costs);
@@ -236,7 +235,9 @@ Controllers.create = async (req, res) => {
     }
 
     propsCost.items = Boolean(order) ? order.items : null;
-    propsCost.checkoutDate = Boolean(order) ? order.checkoutDate : checkoutDate;
+    propsCost.checkoutDate = Boolean(order)
+      ? order.checkoutDate
+      : formatDate(checkoutDate);
     propsCost.typeShipment = Boolean(order) ? order.typeShipment : typeShipment;
     propsCost.store = Boolean(order) ? order.store : dataEmployee.store || null;
     propsCost.linkedOnOrder = Boolean(order);
@@ -350,7 +351,9 @@ Controllers.update = async (req, res) => {
     }
 
     propsCost.items = Boolean(order) ? order.items : null;
-    propsCost.checkoutDate = Boolean(order) ? order.checkoutDate : checkoutDate;
+    propsCost.checkoutDate = Boolean(order)
+      ? order.checkoutDate
+      : formatDate(checkoutDate);
     propsCost.typeShipment = Boolean(order) ? order.typeShipment : typeShipment;
     propsCost.store = Boolean(order) ? order.store : dataEmployee.store || null;
     propsCost.linkedOnOrder = Boolean(order);
