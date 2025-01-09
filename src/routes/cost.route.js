@@ -6,6 +6,7 @@ router.get("/costs", Controllers.getCosts);
 router.get("/costs-by-date-approved", Controllers.getCostsByDateApproved);
 router.post("/add-cost", Controllers.create);
 router.put("/update-cost", Controllers.update);
+router.put("/update-color-cost", Controllers.updateColor);
 router.post("/remove-cost", Controllers.removeCosts);
 
 router.get("/accounts", Controllers.getAccounts);
