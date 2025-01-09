@@ -45,6 +45,15 @@ const CostSchema = mongoose.Schema(
     linkedOnOrder: {
       type: Boolean,
     },
+    backgroundColor: {
+      type: String,
+    },
+    textColor: {
+      type: String,
+    },
+    color: {
+      type: String,
+    },
   },
   {
     timestamps: {

@@ -35,7 +35,9 @@ Controllers.getCosts = async (req, res) => {
       employees,
       typeShipment,
       checkoutDate,
+      approved,
       store,
+      q,
     } = req.query;
 
     const start = new Date(startDate);
@@ -49,17 +51,6 @@ Controllers.getCosts = async (req, res) => {
         $lt: end,
       },
     };
-
-    if (checkoutDate === "with") {
-      query.checkoutDate = { $exists: true, $ne: null };
-    }
-
-    if (checkoutDate === "wihtout") {
-      query.$or = [
-        { checkoutDate: { $exists: false } },
-        { checkoutDate: null },
-      ];
-    }
 
     if (accounts) {
       query.account = { $in: accounts.split(",") };
@@ -75,6 +66,25 @@ Controllers.getCosts = async (req, res) => {
 
     if (store) {
       query.$or = [{ store: store }, { store: null }];
+    }
+
+    if (checkoutDate === "with") {
+      query.checkoutDate = { $exists: true, $ne: null };
+    }
+
+    if (checkoutDate === "wihtout") {
+      query.$or = [
+        { checkoutDate: { $exists: false } },
+        { checkoutDate: null },
+      ];
+    }
+
+    if (approved === "approved") {
+      query.approved = { $exists: true, $ne: null };
+    }
+
+    if (approved === "withoutApproved") {
+      query.$or = [{ approved: { $exists: false } }, { approved: null }];
     }
 
     const costs = await Cost.aggregate([
@@ -104,6 +114,9 @@ Controllers.getCosts = async (req, res) => {
           items: 1,
           store: 1,
           linkedOnOrder: 1,
+          backgroundColor: 1,
+          textColor: 1,
+          color: 1,
           checkoutDate: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -116,6 +129,29 @@ Controllers.getCosts = async (req, res) => {
     ]);
 
     const updatedCostsForItems = adjustItemsForCosts(costs);
+
+    if (q) {
+      const filteredCosts = updatedCostsForItems.filter((cost) => {
+        // Extrae solo los valores de las propiedades específicas
+        const searchableText = [
+          "date",
+          "account",
+          "numOrder",
+          "amount",
+          "store",
+          "items",
+          "dateApproved",
+          "employee",
+          "customer",
+          "typeShipment",
+          "checkoutDate",
+        ]
+          .map((key) => (cost[key] ? cost[key].toString().toLowerCase() : ""))
+          .join(" ");
+        return searchableText.includes(q.toLowerCase());
+      });
+      return res.send({ results: filteredCosts });
+    }
 
     res.send({ results: updatedCostsForItems });
   } catch (error) {
@@ -426,6 +462,32 @@ Controllers.update = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Error al modificar orden" });
+  }
+};
+
+Controllers.updateColor = async (req, res) => {
+  try {
+    const { costsIds, backgroundColor, textColor, color } = req.body;
+
+    const idsToChangeColor = costsIds.map((cost) => cost.id);
+
+    await Cost.updateMany(
+      { _id: { $in: idsToChangeColor } },
+      {
+        $set: {
+          backgroundColor,
+          textColor,
+          color,
+        },
+      }
+    );
+
+    res.send({
+      results: { message: "Colores de pagos actualizados correctamente" },
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error when updating Cost" });
   }
 };
 

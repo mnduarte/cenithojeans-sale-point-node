@@ -111,6 +111,7 @@ Controllers.getOrders = async (req, res) => {
       employee,
       typeShipment,
       checkoutDate,
+      q,
     } = req.query;
 
     const addOneDayDate = new Date(
@@ -185,7 +186,31 @@ Controllers.getOrders = async (req, res) => {
       },
     ]);
 
-    res.send({ results: orders.map((order) => ({ ...order })) });
+    const customOrders = orders.map((order) => ({ ...order }));
+
+    if (q) {
+      const filteredOrders = customOrders.filter((order) => {
+        // Extrae solo los valores de las propiedades específicas
+        const searchableText = [
+          "date",
+          "employee",
+          "order",
+          "store",
+          "typeShipment",
+          "transfer",
+          "cash",
+          "items",
+          "total",
+          "checkoutDate",
+        ]
+          .map((key) => (order[key] ? order[key].toString().toLowerCase() : ""))
+          .join(" ");
+        return searchableText.includes(q.toLowerCase());
+      });
+      return res.send({ results: filteredOrders });
+    }
+
+    res.send({ results: customOrders });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar ordenes" });
@@ -2314,13 +2339,24 @@ Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 22)}
     tpl =
       tpl +
       `
-Importe Efectivo: ${alignRight(formatCurrency(totalCash), 19)}`;
+\x1B\x45Importe Efectivo${
+        percentageCash !== 0 ? "(" + percentageCash + "%)" : ""
+      }:${alignRight(
+        formatCurrency(totalCash),
+        percentageCash !== 0 ? 17 - String(percentageCash).length : 20
+      )}`;
   }
   if (totalTransfer !== 0) {
     tpl =
       tpl +
       `
-Importe Transferencia: ${alignRight(formatCurrency(totalTransfer), 14)}`;
+Importe Transferencia${
+        percentageTransfer !== 0 ? "(" + percentageTransfer + "%)" : ""
+      }: ${alignRight(
+        formatCurrency(totalTransfer),
+
+        percentageTransfer !== 0 ? 11 - String(percentageTransfer).length : 14
+      )}\x1B\x46`;
   }
 
   if (cashWithDisccount && cashWithDisccount !== 0) {
