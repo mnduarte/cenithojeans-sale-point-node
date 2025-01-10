@@ -65,7 +65,7 @@ Controllers.getCosts = async (req, res) => {
     }
 
     if (store) {
-      query.$or = [{ store: store }, { store: null }];
+      query.store = store;
     }
 
     if (checkoutDate === "with") {
@@ -80,11 +80,11 @@ Controllers.getCosts = async (req, res) => {
     }
 
     if (approved === "approved") {
-      query.approved = { $exists: true, $ne: null };
+      query.approved = true;
     }
 
     if (approved === "withoutApproved") {
-      query.$or = [{ approved: { $exists: false } }, { approved: null }];
+      query.$or = [{ approved: { $ne: true } }];
     }
 
     const costs = await Cost.aggregate([
