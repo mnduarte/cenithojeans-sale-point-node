@@ -2440,8 +2440,8 @@ Controllers.print = async (req, res) => {
 
     const formattedData = `${tpl}\n\n\n\n`;
 
-    //const rawCommands = "\x1B\x69";
-    const rawCommands = "\x1B";
+    const rawCommands = "\x1B\x69";
+    //const rawCommands = "\x1B";
     const rawDataToSend = formattedData + rawCommands;
 
     /*printer.printDirect({
