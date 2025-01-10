@@ -2339,11 +2339,11 @@ Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 22)}
     tpl =
       tpl +
       `
-\x1B\x45 Importe Efectivo${
+\x1B\x45IImporte Efectivo${
         percentageCash !== 0 ? "(" + percentageCash + "%)" : ""
       }:${alignRight(
         formatCurrency(totalCash),
-        percentageCash !== 0 ? 16 - String(percentageCash).length : 19
+        percentageCash !== 0 ? 17 - String(percentageCash).length : 20
       )}`;
   }
   if (totalTransfer !== 0) {
