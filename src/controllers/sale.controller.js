@@ -2339,11 +2339,11 @@ Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 22)}
     tpl =
       tpl +
       `
-\x1B\x45Importe Efectivo${
+\x1B\x45 Importe Efectivo${
         percentageCash !== 0 ? "(" + percentageCash + "%)" : ""
       }:${alignRight(
         formatCurrency(totalCash),
-        percentageCash !== 0 ? 17 - String(percentageCash).length : 20
+        percentageCash !== 0 ? 16 - String(percentageCash).length : 19
       )}`;
   }
   if (totalTransfer !== 0) {
@@ -2440,8 +2440,8 @@ Controllers.print = async (req, res) => {
 
     const formattedData = `${tpl}\n\n\n\n`;
 
-    //const rawCommands = "\x1B\x69";
-    const rawCommands = "\x1B";
+    const rawCommands = "\x1B\x69";
+    //const rawCommands = "\x1B";
     const rawDataToSend = formattedData + rawCommands;
 
     printer.printDirect({
