@@ -2339,7 +2339,7 @@ Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 22)}
     tpl =
       tpl +
       `
-\x1B\x45Importe Efectivo${
+\x1B\x45IImporte Efectivo${
         percentageCash !== 0 ? "(" + percentageCash + "%)" : ""
       }:${alignRight(
         formatCurrency(totalCash),
@@ -2350,13 +2350,13 @@ Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 22)}
     tpl =
       tpl +
       `
-Importe Transferencia${
+\x1B\x45IImporte Transferencia${
         percentageTransfer !== 0 ? "(" + percentageTransfer + "%)" : ""
       }: ${alignRight(
         formatCurrency(totalTransfer),
 
         percentageTransfer !== 0 ? 11 - String(percentageTransfer).length : 14
-      )}\x1B\x46`;
+      )}`;
   }
 
   if (cashWithDisccount && cashWithDisccount !== 0) {
@@ -2383,7 +2383,7 @@ Total Final: ${alignRight(formatCurrency(total), 24)}
 
   tpl =
     tpl +
-    `
+    `\x1B\x46
     \nLos cambios pueden realizarse dentro 
 de los 20 dias presentando este ticket
 \nMuchas Gracias por su Compra!
