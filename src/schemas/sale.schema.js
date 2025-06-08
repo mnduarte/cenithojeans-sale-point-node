@@ -51,6 +51,9 @@ const SaleSchema = mongoose.Schema(
     statusRelatedToCost: {
       type: String,
     },
+    accountForTransfer: {
+      type: String,
+    },
     total: {
       type: Number,
     },
