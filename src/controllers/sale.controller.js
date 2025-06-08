@@ -552,6 +552,7 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
           total: 1,
           total: 1,
           cancelled: 1,
+          accountForTransfer: 1,
           _id: 0,
         },
       },
@@ -1773,6 +1774,7 @@ Controllers.create = async (req, res) => {
       totalTransfer,
       totalFinal,
       isWithPrepaid,
+      accountForTransfer,
     } = req.body;
 
     let lastNumOrder = numOrder;
@@ -1813,6 +1815,7 @@ Controllers.create = async (req, res) => {
       username,
       total: totalFinal,
       isWithPrepaid,
+      accountForTransfer,
     });
 
     res.send({ results: "¡Éxito! Se agrego al listado de ventas.!" });
