@@ -6,6 +6,7 @@ router.get("/sales", Controllers.getSales);
 router.get("/orders", Controllers.getOrders);
 router.get("/orders-checkoutdate", Controllers.getOrdersCheckoutDate);
 router.get("/reports", Controllers.getReports);
+router.get("/reports-by-employees", Controllers.getReportsByEmployees);
 router.get("/sales-cash-by-employees", Controllers.getSalesCashByEmployees);
 router.get(
   "/sales-transfer-by-employees",
