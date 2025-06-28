@@ -166,6 +166,9 @@ Controllers.getOrders = async (req, res) => {
           username: 1,
           total: 1,
           cancelled: 1,
+          cancellationReason: 1,
+          cancellationByUser: 1,
+          cancellationDate: 1,
           isWithPrepaid: 1,
           checkoutDate: {
             $dateToString: {
@@ -2316,16 +2319,22 @@ Controllers.updateSaleByEmployee = async (req, res) => {
 
 Controllers.cancelOrders = async (req, res) => {
   try {
-    const { itemsIdSelected } = req.body;
-    const idsToUpdate = itemsIdSelected.map(({ id }) => id);
+    const { itemsIdSelected, reason, user, cancellationDate } = req.body;
 
     await Sale.updateMany(
-      { _id: { $in: idsToUpdate } },
-      { $set: { cancelled: true } }
+      { _id: { $in: itemsIdSelected } },
+      {
+        $set: {
+          cancelled: true,
+          cancellationReason: reason,
+          cancellationByUser: user,
+          cancellationDate: new Date(cancellationDate),
+        },
+      }
     );
 
     const ordersCancelled = await Sale.aggregate([
-      { $match: { _id: { $in: idsToUpdate } } },
+      { $match: { _id: { $in: itemsIdSelected } } },
       {
         $project: {
           id: "$_id",
@@ -2339,6 +2348,67 @@ Controllers.cancelOrders = async (req, res) => {
           username: 1,
           total: 1,
           cancelled: 1,
+          cancellationReason: 1,
+          cancellationByUser: 1,
+          cancellationDate: 1,
+          checkoutDate: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$checkoutDate",
+            },
+          },
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+          _id: 0,
+        },
+      },
+    ]);
+
+    res.send({ results: ordersCancelled });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error when creating the Sale" });
+  }
+};
+
+Controllers.enableOrders = async (req, res) => {
+  try {
+    const { itemsIdSelected } = req.body;
+
+    await Sale.updateMany(
+      { _id: { $in: itemsIdSelected } },
+      {
+        $set: {
+          cancelled: false,
+          cancellationReason: null,
+          cancellationByUser: null,
+          cancellationDate: null,
+        },
+      }
+    );
+
+    const ordersCancelled = await Sale.aggregate([
+      { $match: { _id: { $in: itemsIdSelected } } },
+      {
+        $project: {
+          id: "$_id",
+          store: 1,
+          order: 1,
+          employee: 1,
+          typeShipment: 1,
+          transfer: 1,
+          cash: 1,
+          items: 1,
+          username: 1,
+          total: 1,
+          cancelled: 1,
+          cancellationReason: 1,
+          cancellationByUser: 1,
+          cancellationDate: 1,
           checkoutDate: {
             $dateToString: {
               format: "%d/%m/%Y",

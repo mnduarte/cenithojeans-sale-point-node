@@ -15,6 +15,7 @@ router.get(
 router.put("/update-order", Controllers.updateOrder);
 router.put("/update-sale-by-employee", Controllers.updateSaleByEmployee);
 router.post("/cancel-order", Controllers.cancelOrders);
+router.post("/enable-order", Controllers.enableOrders);
 router.post("/remove-sale", Controllers.removeSales);
 router.post("/last-num-order-by-seller", Controllers.getLastNumOrder);
 router.post("/add-sale", Controllers.create);
