@@ -66,6 +66,15 @@ const SaleSchema = mongoose.Schema(
     cancelled: {
       type: Boolean,
     },
+    cancellationReason: {
+      type: String,
+    },
+    cancellationByUser: {
+      type: String,
+    },
+    cancellationDate: {
+      type: Date,
+    },
     isWithPrepaid: {
       type: Boolean,
     },

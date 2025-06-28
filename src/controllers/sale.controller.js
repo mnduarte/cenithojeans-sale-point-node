@@ -166,6 +166,9 @@ Controllers.getOrders = async (req, res) => {
           username: 1,
           total: 1,
           cancelled: 1,
+          cancellationReason: 1,
+          cancellationByUser: 1,
+          cancellationDate: 1,
           isWithPrepaid: 1,
           checkoutDate: {
             $dateToString: {
@@ -629,8 +632,8 @@ Controllers.getReports = async (req, res) => {
   try {
     const { month, year, store, typeSale } = req.query;
 
-    const firstDayOfMonth = new Date(year, month, 1);
-    const firstDayOfNextMonth = new Date(year, month + 1, 1);
+    const firstDayOfMonth = new Date(Number(year), Number(month), 1);
+    const firstDayOfNextMonth = new Date(Number(year), Number(month) + 1, 1);
 
     const employees = await getAllEmployees();
 
@@ -1514,6 +1517,7 @@ Controllers.getReports = async (req, res) => {
           salesGeneral,
           typeSale,
           salesByEmployees,
+          algo: "maaassss",
         },
       });
 
@@ -1754,6 +1758,305 @@ Controllers.getReports = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar sales" });
+  }
+};
+
+function normalizeByWeeks(result) {
+  const allWeeks = Array.from(
+    new Set(result.employees.flatMap((e) => e.data.map((d) => d.week)))
+  ).sort((a, b) => a - b);
+
+  result.employees = result.employees.map((e) => {
+    const weekMap = new Map(e.data.map((d) => [d.week, d.items]));
+    const normalized = allWeeks.map((week) => ({
+      week,
+      items: weekMap.get(week) ?? 0,
+    }));
+    return { ...e, data: normalized };
+  });
+
+  return result;
+}
+
+Controllers.getReportsByEmployees = async (req, res) => {
+  try {
+    const { typeDate, startDate, endDate, month, year, employees } = req.query;
+
+    let fromDate, toDate;
+    if (typeDate === "byDate") {
+      fromDate = new Date(startDate);
+      toDate = new Date(endDate);
+      toDate.setDate(toDate.getDate() + 1);
+    } else {
+      fromDate = new Date(Number(year), Number(month), 1);
+      toDate = new Date(Number(year), Number(month) + 1, 1);
+    }
+
+    const employeeList = employees ? employees.split(",") : [];
+    const allEmployees = await getAllEmployees();
+
+    const buildMatch = (store, filters = {}) => {
+      const match = {
+        store,
+        createdAt: { $gte: fromDate, $lt: toDate },
+        cancelled: { $ne: true },
+        ...filters,
+      };
+      if (employeeList.length > 0) {
+        match.employee = { $in: employeeList };
+      }
+      return match;
+    };
+
+    const getEmployeePosition = (name) => {
+      return allEmployees.find((e) => e.name === name)?.position || 999;
+    };
+
+    const formatResult = (entries, keyMapFn) => {
+      const empMap = new Map();
+      for (const entry of entries) {
+        const key = entry._id.employee;
+        const value = keyMapFn(entry);
+        const position = getEmployeePosition(key);
+        const current = empMap.get(key) || {
+          employee: key,
+          position,
+          data: [],
+        };
+        current.data.push(value);
+        empMap.set(key, current);
+      }
+      const employees = Array.from(empMap.values()).sort(
+        (a, b) => a.position - b.position
+      );
+      const totalItems = employees.reduce(
+        (acc, e) =>
+          acc +
+          e.data.reduce((sum, d) => sum + (d.items || d.quantity || 0), 0),
+        0
+      );
+      return { employees, totalItems };
+    };
+
+    const fetchData = async (store) => {
+      const [
+        byItemWeek,
+        byItemShipmentRetiraLocal,
+        byItemShipmentEnvio,
+        byItemSaleLocal,
+        byQuantitySalePedido,
+      ] = await Promise.all([
+        // byItemWeek
+        Sale.aggregate([
+          {
+            $match: buildMatch(store, {
+              typeSale: "local",
+              $or: [{ cash: { $gt: 0 } }, { transfer: { $gt: 0 } }],
+            }),
+          },
+          {
+            $project: {
+              id: "$_id",
+              order: 1,
+              employee: 1,
+              cash: 1,
+              transfer: 1,
+              items: 1,
+              total: 1,
+              _id: 0,
+              date: {
+                $dateToString: {
+                  format: "%d/%m/%Y",
+                  date: "$createdAt",
+                },
+              },
+              week: { $isoWeek: "$createdAt" },
+            },
+          },
+          {
+            $group: {
+              _id: { week: "$week", employee: "$employee" },
+              totalItems: { $sum: "$items" },
+            },
+          },
+          {
+            $sort: { "_id.week": 1 },
+          },
+        ]),
+
+        // byItemShipmentRetiraLocal
+        Sale.aggregate([
+          {
+            $match: buildMatch(store, {
+              typeSale: "pedido",
+              typeShipment: "retiraLocal",
+              checkoutDate: { $exists: true, $ne: null },
+            }),
+          },
+          {
+            $group: {
+              _id: { employee: "$employee" },
+              totalItems: { $sum: "$items" },
+            },
+          },
+        ]),
+
+        // byItemShipmentEnvio
+        Sale.aggregate([
+          {
+            $match: buildMatch(store, {
+              typeSale: "pedido",
+              typeShipment: "envio",
+              checkoutDate: { $exists: true, $ne: null },
+            }),
+          },
+          {
+            $group: {
+              _id: { employee: "$employee" },
+              totalItems: { $sum: "$items" },
+            },
+          },
+        ]),
+
+        // byItemSaleLocal
+        Sale.aggregate([
+          {
+            $match: buildMatch(store, {
+              typeSale: "local",
+            }),
+          },
+          {
+            $group: {
+              _id: { employee: "$employee" },
+              totalItems: { $sum: "$items" },
+            },
+          },
+        ]),
+
+        // byQuantitySalePedido
+        Sale.aggregate([
+          {
+            $match: buildMatch(store, {
+              typeSale: "pedido",
+              checkoutDate: { $exists: true, $ne: null },
+            }),
+          },
+          {
+            $group: {
+              _id: { employee: "$employee" },
+              total: { $sum: 1 },
+            },
+          },
+        ]),
+      ]);
+
+      // Construir byItemConcept
+      const allEmployeesSet = new Set([
+        ...byItemSaleLocal.map((e) => e._id.employee),
+        ...byItemShipmentRetiraLocal.map((e) => e._id.employee),
+        ...byItemShipmentEnvio.map((e) => e._id.employee),
+      ]);
+
+      const allEmployeesList = Array.from(allEmployeesSet);
+
+      const byItemConceptMap = new Map();
+
+      for (const name of allEmployeesList) {
+        const position = getEmployeePosition(name);
+
+        const saleLocal = byItemSaleLocal.find((e) => e._id.employee === name);
+        const retiroLocal = byItemShipmentRetiraLocal.find(
+          (e) => e._id.employee === name
+        );
+        const envio = byItemShipmentEnvio.find((e) => e._id.employee === name);
+
+        const data = [
+          { concept: "Venta local", items: saleLocal?.totalItems || 0 },
+          {
+            concept: "Pedido (Retira local)",
+            items: retiroLocal?.totalItems || 0,
+          },
+          { concept: "Pedido (Envio)", items: envio?.totalItems || 0 },
+        ];
+
+        byItemConceptMap.set(name, {
+          employee: name,
+          position,
+          data,
+        });
+      }
+
+      const byItemConceptEmployees = Array.from(byItemConceptMap.values()).sort(
+        (a, b) => a.position - b.position
+      );
+
+      const byItemConceptTotalItems = byItemConceptEmployees.reduce(
+        (total, emp) => total + emp.data.reduce((sum, d) => sum + d.items, 0),
+        0
+      );
+
+      // Construir byItemConcept (resumen por concepto)
+      const concepts = [
+        { concept: "Venta local", items: 0 },
+        { concept: "Pedido (Retira local)", items: 0 },
+        { concept: "Pedido (Envio)", items: 0 },
+      ];
+
+      for (const emp of byItemConceptEmployees) {
+        for (const item of emp.data) {
+          const conceptEntry = concepts.find((c) => c.concept === item.concept);
+          if (conceptEntry) {
+            conceptEntry.items += item.items;
+          }
+        }
+      }
+
+      const totalItemsByConcept = concepts.reduce((acc, c) => acc + c.items, 0);
+
+      return {
+        byItemWeek: normalizeByWeeks(
+          formatResult(byItemWeek, (e) => ({
+            week: e._id.week,
+            items: e.totalItems,
+          }))
+        ),
+        byItemShipmentRetiraLocal: formatResult(
+          byItemShipmentRetiraLocal,
+          (e) => ({ typeShipment: "retiroLocal", items: e.totalItems })
+        ),
+        byItemShipmentEnvio: formatResult(byItemShipmentEnvio, (e) => ({
+          typeShipment: "envio",
+          items: e.totalItems,
+        })),
+        byItemSaleLocal: formatResult(byItemSaleLocal, (e) => ({
+          items: e.totalItems,
+        })),
+        byQuantitySalePedido: formatResult(byQuantitySalePedido, (e) => ({
+          quantity: e.total,
+        })),
+        byItemConceptEmployee: {
+          employees: byItemConceptEmployees,
+          totalItems: byItemConceptTotalItems,
+        },
+        byItemConcept: {
+          concepts,
+          totalItems: totalItemsByConcept,
+        },
+      };
+    };
+
+    const [bogotaData, helgueraData] = await Promise.all([
+      fetchData("BOGOTA"),
+      fetchData("HELGUERA"),
+    ]);
+
+    return res.send({
+      BOGOTA: bogotaData,
+      HELGUERA: helgueraData,
+    });
+  } catch (error) {
+    console.error("Error getting weekly items by employee:", error);
+    res.status(500).send({ error: "Internal server error" });
   }
 };
 
@@ -2016,16 +2319,22 @@ Controllers.updateSaleByEmployee = async (req, res) => {
 
 Controllers.cancelOrders = async (req, res) => {
   try {
-    const { itemsIdSelected } = req.body;
-    const idsToUpdate = itemsIdSelected.map(({ id }) => id);
+    const { itemsIdSelected, reason, user, cancellationDate } = req.body;
 
     await Sale.updateMany(
-      { _id: { $in: idsToUpdate } },
-      { $set: { cancelled: true } }
+      { _id: { $in: itemsIdSelected } },
+      {
+        $set: {
+          cancelled: true,
+          cancellationReason: reason,
+          cancellationByUser: user,
+          cancellationDate: new Date(cancellationDate),
+        },
+      }
     );
 
     const ordersCancelled = await Sale.aggregate([
-      { $match: { _id: { $in: idsToUpdate } } },
+      { $match: { _id: { $in: itemsIdSelected } } },
       {
         $project: {
           id: "$_id",
@@ -2039,6 +2348,67 @@ Controllers.cancelOrders = async (req, res) => {
           username: 1,
           total: 1,
           cancelled: 1,
+          cancellationReason: 1,
+          cancellationByUser: 1,
+          cancellationDate: 1,
+          checkoutDate: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$checkoutDate",
+            },
+          },
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+          _id: 0,
+        },
+      },
+    ]);
+
+    res.send({ results: ordersCancelled });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error when creating the Sale" });
+  }
+};
+
+Controllers.enableOrders = async (req, res) => {
+  try {
+    const { itemsIdSelected } = req.body;
+
+    await Sale.updateMany(
+      { _id: { $in: itemsIdSelected } },
+      {
+        $set: {
+          cancelled: false,
+          cancellationReason: null,
+          cancellationByUser: null,
+          cancellationDate: null,
+        },
+      }
+    );
+
+    const ordersCancelled = await Sale.aggregate([
+      { $match: { _id: { $in: itemsIdSelected } } },
+      {
+        $project: {
+          id: "$_id",
+          store: 1,
+          order: 1,
+          employee: 1,
+          typeShipment: 1,
+          transfer: 1,
+          cash: 1,
+          items: 1,
+          username: 1,
+          total: 1,
+          cancelled: 1,
+          cancellationReason: 1,
+          cancellationByUser: 1,
+          cancellationDate: 1,
           checkoutDate: {
             $dateToString: {
               format: "%d/%m/%Y",
