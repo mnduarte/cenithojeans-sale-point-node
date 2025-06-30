@@ -12,6 +12,7 @@
   "author": "Matias Duarte",
   "license": "ISC",
   "dependencies": {
+    "@woovi/node-printer": "^1.0.1",
     "bluebird": "^3.7.2",
     "core-logger": "^0.1.4",
     "cors": "^2.8.5",
