@@ -1767,16 +1767,23 @@ function normalizeByWeeks(result) {
   ).sort((a, b) => a - b);
 
   result.employees = result.employees.map((e) => {
-    const weekMap = new Map(e.data.map((d) => [d.week, d.items]));
-    const normalized = allWeeks.map((week) => ({
-      week,
-      items: weekMap.get(week) ?? 0,
-    }));
+    const weekMap = new Map(e.data.map((d) => [d.week, d]));
+    const normalized = allWeeks.map((week) => {
+      const existing = weekMap.get(week);
+      return existing ? existing : { week, items: 0 }; // sin weekday si no existía
+    });
     return { ...e, data: normalized };
   });
 
   return result;
 }
+
+const formatDateDM = (date) => {
+  const d = new Date(date);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${day}/${month}`;
+};
 
 Controllers.getReportsByEmployees = async (req, res) => {
   try {
@@ -1857,19 +1864,9 @@ Controllers.getReportsByEmployees = async (req, res) => {
           {
             $project: {
               id: "$_id",
-              order: 1,
               employee: 1,
-              cash: 1,
-              transfer: 1,
               items: 1,
-              total: 1,
-              _id: 0,
-              date: {
-                $dateToString: {
-                  format: "%d/%m/%Y",
-                  date: "$createdAt",
-                },
-              },
+              createdAt: 1,
               week: { $isoWeek: "$createdAt" },
             },
           },
@@ -1877,6 +1874,8 @@ Controllers.getReportsByEmployees = async (req, res) => {
             $group: {
               _id: { week: "$week", employee: "$employee" },
               totalItems: { $sum: "$items" },
+              minDate: { $min: "$createdAt" },
+              maxDate: { $max: "$createdAt" },
             },
           },
           {
@@ -2018,6 +2017,9 @@ Controllers.getReportsByEmployees = async (req, res) => {
           formatResult(byItemWeek, (e) => ({
             week: e._id.week,
             items: e.totalItems,
+            weekdays: `${e._id.week} (${formatDateDM(e.minDate)}-${formatDateDM(
+              e.maxDate
+            )})`,
           }))
         ),
         byItemShipmentRetiraLocal: formatResult(
