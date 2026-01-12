@@ -13,6 +13,7 @@ const schemas = {
   UpdateDB: require("../schemas/update-db.schema"),
   Cost: require("../schemas/cost.schema"),
   Account: require("../schemas/account.schema"),
+  Cashier: require("../schemas/cashier.schema"),
 };
 
 class BaseModel {

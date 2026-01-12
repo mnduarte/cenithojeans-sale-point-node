@@ -12,6 +12,11 @@ const PriceSchema = mongoose.Schema(
     active: {
       type: Boolean,
     },
+    type: {
+      type: String,
+      enum: ["jeans", "remera"],
+      default: "jeans",
+    },
   },
   {
     timestamps: {

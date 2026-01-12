@@ -30,6 +30,14 @@ const CashflowSchema = mongoose.Schema(
     cancelled: {
       type: Boolean,
     },
+    // Campos de cajero
+    cashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    cashierName: {
+      type: String,
+    },
   },
   {
     timestamps: {

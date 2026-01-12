@@ -81,6 +81,27 @@ const SaleSchema = mongoose.Schema(
     approved: {
       type: Boolean,
     },
+    cashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    cashierName: {
+      type: String,
+    },
+    lastEditCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    lastEditCashierName: {
+      type: String,
+    },
+    checkoutCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    checkoutCashierName: {
+      type: String,
+    },
   },
   {
     timestamps: {

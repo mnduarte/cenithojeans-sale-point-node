@@ -15,6 +15,8 @@ Controllers.create = async (req, res) => {
       items,
       typePayment,
       date,
+      cashierId,
+      cashierName,
     } = req.body;
 
     const newCashFlow = await Cashflow.create({
@@ -26,6 +28,8 @@ Controllers.create = async (req, res) => {
       items,
       typePayment,
       date,
+      cashierId,
+      cashierName,
     });
 
     res.send({
@@ -68,6 +72,8 @@ Controllers.getCashflowByDay = async (req, res) => {
           description: 1,
           typePayment: 1,
           items: 1,
+          cashierId: 1,
+          cashierName: 1,
           _id: 0,
         },
       },
@@ -129,6 +135,8 @@ Controllers.getOutgoingsByDay = async (req, res) => {
           employee: 1,
           store: 1,
           description: 1,
+          cashierId: 1,
+          cashierName: 1,
           _id: 0,
         },
       },
@@ -192,6 +200,8 @@ Controllers.remove = async (req, res) => {
           store: 1,
           description: 1,
           items: 1,
+          cashierId: 1,
+          cashierName: 1,
           _id: 0,
         },
       },

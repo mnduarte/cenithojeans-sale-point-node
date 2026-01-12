@@ -11,6 +11,7 @@ const getAllPrices = async () =>
         id: "$_id",
         price: 1,
         active: 1,
+        type: 1,
         _id: 0,
       },
     },
@@ -30,11 +31,12 @@ Controllers.getAll = async (req, res) => {
 
 Controllers.create = async (req, res) => {
   try {
-    const { price, active } = req.body;
+    const { price, active, type } = req.body;
 
     await Price.create({
       price,
       active,
+      type: type || "jeans",
     });
 
     const prices = await getAllPrices();
@@ -77,10 +79,10 @@ Controllers.deleteSelectedPrices = async (req, res) => {
 
 Controllers.update = async (req, res) => {
   try {
-    const { id, price, active } = req.body;
+    const { id, price, active, type } = req.body;
     const updatedPrice = await Price.findByIdAndUpdate(
       { _id: id },
-      { price, active }
+      { price, active, type }
     );
 
     if (updatedPrice) {

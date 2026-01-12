@@ -54,6 +54,29 @@ const CostSchema = mongoose.Schema(
     color: {
       type: String,
     },
+    // Campos de cajero
+    cashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    cashierName: {
+      type: String,
+    },
+    // Cajero que editó por última vez
+    lastEditCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    lastEditCashierName: {
+      type: String,
+    },
+    checkoutCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    checkoutCashierName: {
+      type: String,
+    },
   },
   {
     timestamps: {

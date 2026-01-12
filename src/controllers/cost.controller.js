@@ -38,6 +38,7 @@ Controllers.getCosts = async (req, res) => {
       approved,
       store,
       q,
+      cashierId,
     } = req.query;
 
     const start = new Date(startDate);
@@ -87,6 +88,11 @@ Controllers.getCosts = async (req, res) => {
       query.$or = [{ approved: { $ne: true } }];
     }
 
+    // Filtro por cajero
+    if (cashierId && cashierId !== "all") {
+      query.cashierId = cashierId;
+    }
+
     const costs = await Cost.aggregate([
       { $match: query },
       {
@@ -117,6 +123,12 @@ Controllers.getCosts = async (req, res) => {
           backgroundColor: 1,
           textColor: 1,
           color: 1,
+          cashierId: 1,
+          cashierName: 1,
+          lastEditCashierId: 1,
+          lastEditCashierName: 1,
+          checkoutCashierId: 1,
+          checkoutCashierName: 1,
           checkoutDate: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -207,6 +219,12 @@ Controllers.getCostsByDateApproved = async (req, res) => {
           items: 1,
           store: 1,
           linkedOnOrder: 1,
+          cashierId: 1,
+          cashierName: 1,
+          lastEditCashierId: 1,
+          lastEditCashierName: 1,
+          checkoutCashierId: 1,
+          checkoutCashierName: 1,
           checkoutDate: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -241,6 +259,10 @@ Controllers.create = async (req, res) => {
       customer,
       typeShipment,
       checkoutDate,
+      cashierId,
+      cashierName,
+      checkoutCashierId,
+      checkoutCashierName,
     } = req.body;
 
     const propsCost = {
@@ -254,6 +276,10 @@ Controllers.create = async (req, res) => {
       customer,
       typeShipment,
       checkoutDate: formatDate(checkoutDate),
+      cashierId,
+      cashierName,
+      checkoutCashierId,
+      checkoutCashierName,
     };
 
     const order = await Sale.findOne({
@@ -357,6 +383,10 @@ Controllers.update = async (req, res) => {
       customer,
       typeShipment,
       checkoutDate,
+      lastEditCashierId,
+      lastEditCashierName,
+      checkoutCashierId,
+      checkoutCashierName,
     } = req.body;
 
     const propsCost = {
@@ -371,6 +401,18 @@ Controllers.update = async (req, res) => {
       typeShipment,
       checkoutDate: formatDate(checkoutDate),
     };
+
+    // Agregar cajero que editó
+    if (lastEditCashierId) {
+      propsCost.lastEditCashierId = lastEditCashierId;
+      propsCost.lastEditCashierName = lastEditCashierName;
+    }
+
+    // Agregar cajero que marcó salida
+    if (checkoutCashierId) {
+      propsCost.checkoutCashierId = checkoutCashierId;
+      propsCost.checkoutCashierName = checkoutCashierName;
+    }
 
     const order = await Sale.findOne({
       order: numOrder,

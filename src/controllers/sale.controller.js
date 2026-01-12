@@ -178,6 +178,12 @@ Controllers.getOrders = async (req, res) => {
           },
           approved: 1,
           statusRelatedToCost: 1,
+          cashierId: 1,
+          cashierName: 1,
+          lastEditCashierId: 1,
+          lastEditCashierName: 1,
+          checkoutCashierId: 1,
+          checkoutCashierName: 1,
           date: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -267,6 +273,12 @@ Controllers.getOrdersCheckoutDate = async (req, res) => {
           total: 1,
           cancelled: 1,
           approved: 1,
+          cashierId: 1,
+          cashierName: 1,
+          lastEditCashierId: 1,
+          lastEditCashierName: 1,
+          checkoutCashierId: 1,
+          checkoutCashierName: 1,
           checkoutDate: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -322,6 +334,8 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           store: 1,
           description: 1,
           items: 1,
+          cashierId: 1,
+          cashierName: 1,
           _id: 0,
         },
       },
@@ -355,6 +369,8 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           total: 1,
           cancelled: 1,
           description: 1,
+          cashierId: 1,
+          cashierName: 1,
           _id: 0,
         },
       },
@@ -401,6 +417,8 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           total: 1,
           cancelled: 1,
           description: 1,
+          cashierId: 1,
+          cashierName: 1,
           _id: 0,
         },
       },
@@ -436,6 +454,8 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           cancelled: 1,
           description: 1,
           isWithPrepaid: 1,
+          cashierId: 1,
+          cashierName: 1,
           _id: 0,
         },
       },
@@ -2079,6 +2099,8 @@ Controllers.create = async (req, res) => {
       totalFinal,
       isWithPrepaid,
       accountForTransfer,
+      cashierId,
+      cashierName,
     } = req.body;
 
     let lastNumOrder = numOrder;
@@ -2120,6 +2142,8 @@ Controllers.create = async (req, res) => {
       total: totalFinal,
       isWithPrepaid,
       accountForTransfer,
+      cashierId,
+      cashierName,
     });
 
     res.send({ results: "¡Éxito! Se agrego al listado de ventas.!" });
@@ -2184,13 +2208,26 @@ Controllers.createSaleByEmployee = async (req, res) => {
 
 Controllers.updateOrder = async (req, res) => {
   try {
-    const { id, dataIndex, value } = req.body;
+    const { id, dataIndex, value, cashierId, cashierName } = req.body;
 
     const saleToUpdate = await Sale.findOne({
       _id: id,
     });
 
     saleToUpdate[dataIndex] = value;
+
+    // Si hay cajero seleccionado, actualizar según el tipo de campo
+    if (cashierId && cashierName) {
+      if (dataIndex === "checkoutDate") {
+        // Campo de salida: guardar en checkoutCashier
+        saleToUpdate.checkoutCashierId = cashierId;
+        saleToUpdate.checkoutCashierName = cashierName;
+      } else {
+        // Otros campos editables: guardar en lastEditCashier
+        saleToUpdate.lastEditCashierId = cashierId;
+        saleToUpdate.lastEditCashierName = cashierName;
+      }
+    }
 
     if (dataIndex === "cash") {
       saleToUpdate.total = saleToUpdate.transfer + value;
@@ -2269,6 +2306,12 @@ Controllers.updateOrder = async (req, res) => {
     const transformedResults = {
       ...saleToUpdate._doc,
       id: saleToUpdate._id,
+      cashierId: saleToUpdate.cashierId,
+      cashierName: saleToUpdate.cashierName,
+      lastEditCashierId: saleToUpdate.lastEditCashierId,
+      lastEditCashierName: saleToUpdate.lastEditCashierName,
+      checkoutCashierId: saleToUpdate.checkoutCashierId,
+      checkoutCashierName: saleToUpdate.checkoutCashierName,
     };
 
     if (saleToUpdate.checkoutDate) {
@@ -2566,6 +2609,7 @@ const templateRecieve = async ({
   totalTransfer,
   totalToPay,
   total,
+  cashierName,
 }) => {
   const alignRight = (text, width) => {
     const spaces = width - text.length;
@@ -2647,7 +2691,7 @@ www.cenitho.com\n`;
   tpl =
     tpl +
     `
-  Cajero: ${username} | ${typeSale} | N° ${numOrderLocalOrPedido}
+  Cajero: ${cashierName} | ${typeSale} | N° ${numOrderLocalOrPedido}
   
   Items:\n${pricesToString(pricesSelected)}
   Total de prendas: ${pricesSelected.reduce(
@@ -2788,6 +2832,7 @@ Controllers.print = async (req, res) => {
       totalTransfer,
       totalToPay,
       total,
+      cashierName,
     } = req.body;
 
     const tpl = await templateRecieve({
@@ -2810,6 +2855,7 @@ Controllers.print = async (req, res) => {
       totalTransfer,
       totalToPay,
       total,
+      cashierName,
     });
 
     const formattedData = `${tpl}\n\n\n\n`;
