@@ -19,6 +19,15 @@ Controllers.create = async (req, res) => {
       cashierName,
     } = req.body;
 
+    const selectedDate = new Date(date);
+    const now = new Date();
+    selectedDate.setHours(
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds()
+    );
+
     const newCashFlow = await Cashflow.create({
       type,
       amount,
@@ -27,7 +36,7 @@ Controllers.create = async (req, res) => {
       description,
       items,
       typePayment,
-      date,
+      createdAt: selectedDate,
       cashierId,
       cashierName,
     });

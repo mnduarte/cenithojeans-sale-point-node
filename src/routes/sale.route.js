@@ -12,6 +12,9 @@ router.get(
   "/sales-transfer-by-employees",
   Controllers.getSalesTransferByEmployees
 );
+
+router.get("/sales-with-devolutions", Controllers.getSalesWithDevolutions);
+
 router.put("/update-order", Controllers.updateOrder);
 router.put("/update-sale-by-employee", Controllers.updateSaleByEmployee);
 router.post("/cancel-order", Controllers.cancelOrders);

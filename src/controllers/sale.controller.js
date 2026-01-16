@@ -629,6 +629,8 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
           // Montos base para pago mixto
           baseCash: 1,
           baseTransfer: 1,
+          // Hora de creación
+          createdAt: 1,
           _id: 0,
         },
       },
@@ -664,6 +666,8 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
           description: 1,
           items: 1,
           typePayment: 1,
+          // Hora de creación
+          createdAt: 1,
           _id: 0,
         },
       },
@@ -698,6 +702,96 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al buscar sales" });
+  }
+};
+
+// Endpoint para obtener ventas con devoluciones (tipo local)
+Controllers.getSalesWithDevolutions = async (req, res) => {
+  try {
+    const { date, store } = req.query;
+
+    const addOneDayDate = new Date(
+      new Date(date).setDate(new Date(date).getDate() + 1)
+    );
+
+    const query = {
+      createdAt: {
+        $gte: new Date(date),
+        $lt: addOneDayDate,
+      },
+      typeSale: "local",
+      $or: [{ cancelled: false }, { cancelled: { $exists: false } }],
+      cancelled: { $ne: true },
+    };
+
+    if (store !== "ALL") {
+      query.store = store;
+    }
+
+    const sales = await Sale.aggregate([
+      { $match: query },
+      {
+        $project: {
+          id: "$_id",
+          order: 1,
+          typeSale: 1,
+          employee: 1,
+          username: 1,
+          items: 1,
+          devolutionItems: 1,
+          subTotalDevolutionItems: 1,
+          itemsDevolutionJeans: 1,
+          itemsDevolutionRemeras: 1,
+          subTotalDevolutionCashJeans: 1,
+          subTotalDevolutionCashRemeras: 1,
+          subTotalDevolutionTransferJeans: 1,
+          subTotalDevolutionTransferRemeras: 1,
+          cash: 1,
+          transfer: 1,
+          total: 1,
+          createdAt: 1,
+          _id: 0,
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+    ]);
+
+    // Agregar campos calculados para montos totales de devolución por tipo
+    const salesWithTotals = sales.map((sale) => ({
+      ...sale,
+      // Monto total devolución jeans (cash + transfer)
+      montoDevolucionJeans:
+        (sale.subTotalDevolutionCashJeans || 0) +
+        (sale.subTotalDevolutionTransferJeans || 0),
+      // Monto total devolución remeras (cash + transfer)
+      montoDevolucionRemeras:
+        (sale.subTotalDevolutionCashRemeras || 0) +
+        (sale.subTotalDevolutionTransferRemeras || 0),
+    }));
+
+    const employees = await getAllEmployees();
+
+    const salesWithPosition = salesWithTotals
+      .map((sale) => {
+        const findDetailFromEmployee = employees.find(
+          (emp) => sale.employee === emp.name
+        );
+        return { ...sale, position: findDetailFromEmployee?.position || 999 };
+      })
+      .sort(
+        (a, b) =>
+          (a.position || employees.length + 1) -
+          (b.position || employees.length + 1)
+      );
+
+    res.send({ results: salesWithPosition });
+  } catch (error) {
+    console.log(error);
+    res
+      .status(500)
+      .json({ message: "Error al buscar ventas con devoluciones" });
   }
 };
 
