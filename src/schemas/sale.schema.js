@@ -30,8 +30,35 @@ const SaleSchema = mongoose.Schema(
     cash: {
       type: Number,
     },
+    // Montos BASE (antes de aplicar descuento/recargo) - para cálculo correcto en pago mixto
+    baseCash: {
+      type: Number,
+      default: 0,
+    },
+    baseTransfer: {
+      type: Number,
+      default: 0,
+    },
     items: {
       type: Number,
+    },
+    // Items por tipo de producto
+    itemsJeans: {
+      type: Number,
+      default: 0,
+    },
+    itemsRemeras: {
+      type: Number,
+      default: 0,
+    },
+    // Items devolución por tipo
+    itemsDevolutionJeans: {
+      type: Number,
+      default: 0,
+    },
+    itemsDevolutionRemeras: {
+      type: Number,
+      default: 0,
     },
     subTotalItems: {
       type: Number,
@@ -41,6 +68,59 @@ const SaleSchema = mongoose.Schema(
     },
     subTotalDevolutionItems: {
       type: Number,
+    },
+    // Subtotales CASH por tipo de producto
+    subTotalCashJeans: {
+      type: Number,
+      default: 0,
+    },
+    subTotalCashRemeras: {
+      type: Number,
+      default: 0,
+    },
+    // Subtotales TRANSFER por tipo de producto
+    subTotalTransferJeans: {
+      type: Number,
+      default: 0,
+    },
+    subTotalTransferRemeras: {
+      type: Number,
+      default: 0,
+    },
+    // Subtotales devolución CASH por tipo
+    subTotalDevolutionCashJeans: {
+      type: Number,
+      default: 0,
+    },
+    subTotalDevolutionCashRemeras: {
+      type: Number,
+      default: 0,
+    },
+    // Subtotales devolución TRANSFER por tipo
+    subTotalDevolutionTransferJeans: {
+      type: Number,
+      default: 0,
+    },
+    subTotalDevolutionTransferRemeras: {
+      type: Number,
+      default: 0,
+    },
+    // Montos de recargos y descuentos
+    amountOfSurchargesCash: {
+      type: Number,
+      default: 0,
+    },
+    amountOfDiscountCash: {
+      type: Number,
+      default: 0,
+    },
+    amountOfSurchargesTransfer: {
+      type: Number,
+      default: 0,
+    },
+    amountOfDiscountTransfer: {
+      type: Number,
+      default: 0,
     },
     percentageToDisccountOrAdd: {
       type: Number,
