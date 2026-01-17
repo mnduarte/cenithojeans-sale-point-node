@@ -27,6 +27,12 @@ const EmployeeSchema = mongoose.Schema(
     activeForCost: {
       type: Boolean,
     },
+    // Tipo de venta asignado: "ambos", "local", "pedido"
+    saleType: {
+      type: String,
+      enum: ["ambos", "local", "pedido"],
+      default: "ambos",
+    },
   },
   {
     timestamps: {

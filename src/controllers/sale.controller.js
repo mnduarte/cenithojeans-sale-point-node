@@ -834,6 +834,7 @@ Controllers.getReports = async (req, res) => {
             cash: "$cash",
             transfer: "$transfer",
             items: 1,
+            devolutionItems: 1,
             total: 1,
             _id: 0,
             date: {
@@ -849,6 +850,7 @@ Controllers.getReports = async (req, res) => {
           $group: {
             _id: { week: "$week", date: "$date" },
             items: { $sum: "$items" },
+            devolutionItems: { $sum: "$devolutionItems" },
             cash: { $sum: "$cash" },
             transfer: { $sum: "$transfer" },
             total: { $sum: "$total" },
@@ -864,6 +866,7 @@ Controllers.getReports = async (req, res) => {
               $push: {
                 date: "$_id.date",
                 items: "$items",
+                devolutionItems: "$devolutionItems",
                 cash: "$cash",
                 transfer: "$transfer",
                 total: "$total",
@@ -1048,6 +1051,7 @@ Controllers.getReports = async (req, res) => {
             cash: 1,
             transfer: 1,
             items: 1,
+            devolutionItems: 1,
             total: 1,
             _id: 0,
             date: {
@@ -1063,6 +1067,7 @@ Controllers.getReports = async (req, res) => {
           $group: {
             _id: { week: "$week", date: "$date", employee: "$employee" },
             items: { $sum: "$items" },
+            devolutionItems: { $sum: "$devolutionItems" },
             cash: { $sum: "$cash" },
             transfer: { $sum: "$transfer" },
             total: { $sum: "$total" },
@@ -1078,6 +1083,7 @@ Controllers.getReports = async (req, res) => {
               $push: {
                 date: "$_id.date",
                 items: "$items",
+                devolutionItems: "$devolutionItems",
                 cash: "$cash",
                 transfer: "$transfer",
                 total: "$total",
@@ -1584,6 +1590,7 @@ Controllers.getReports = async (req, res) => {
                   foundSale || {
                     date: day,
                     items: 0,
+                    devolutionItems: 0,
                     cash: 0,
                     transfer: 0,
                     total: 0,
@@ -1716,6 +1723,7 @@ Controllers.getReports = async (req, res) => {
             cash: "$cash",
             transfer: "$transfer",
             items: 1,
+            devolutionItems: 1,
             total: 1,
             _id: 0,
             date: {
@@ -1731,6 +1739,7 @@ Controllers.getReports = async (req, res) => {
           $group: {
             _id: { week: "$week", date: "$date" },
             items: { $sum: "$items" },
+            devolutionItems: { $sum: "$devolutionItems" },
             cash: { $sum: "$cash" },
             transfer: { $sum: "$transfer" },
             total: { $sum: "$total" },
@@ -1746,6 +1755,7 @@ Controllers.getReports = async (req, res) => {
               $push: {
                 date: "$_id.date",
                 items: "$items",
+                devolutionItems: "$devolutionItems",
                 cash: "$cash",
                 transfer: "$transfer",
                 total: "$total",
@@ -1789,6 +1799,7 @@ Controllers.getReports = async (req, res) => {
             cash: 1,
             transfer: 1,
             items: 1,
+            devolutionItems: 1,
             total: 1,
             _id: 0,
             date: {
@@ -1804,6 +1815,7 @@ Controllers.getReports = async (req, res) => {
           $group: {
             _id: { week: "$week", date: "$date", employee: "$employee" },
             items: { $sum: "$items" },
+            devolutionItems: { $sum: "$devolutionItems" },
             cash: { $sum: "$cash" },
             transfer: { $sum: "$transfer" },
             total: { $sum: "$total" },
@@ -1819,6 +1831,7 @@ Controllers.getReports = async (req, res) => {
               $push: {
                 date: "$_id.date",
                 items: "$items",
+                devolutionItems: "$devolutionItems",
                 cash: "$cash",
                 transfer: "$transfer",
                 total: "$total",
@@ -1885,6 +1898,7 @@ Controllers.getReports = async (req, res) => {
                   foundSale || {
                     date: day,
                     items: 0,
+                    devolutionItems: 0,
                     cash: 0,
                     transfer: 0,
                     total: 0,
@@ -1936,7 +1950,7 @@ function normalizeByWeeks(result) {
     const weekMap = new Map(e.data.map((d) => [d.week, d]));
     const normalized = allWeeks.map((week) => {
       const existing = weekMap.get(week);
-      return existing ? existing : { week, items: 0 }; // sin weekday si no existía
+      return existing ? existing : { week, items: 0, devolutionItems: 0 }; // sin weekday si no existía
     });
     return { ...e, data: normalized };
   });
@@ -2008,7 +2022,12 @@ Controllers.getReportsByEmployees = async (req, res) => {
           e.data.reduce((sum, d) => sum + (d.items || d.quantity || 0), 0),
         0
       );
-      return { employees, totalItems };
+      const totalDevolutionItems = employees.reduce(
+        (acc, e) =>
+          acc + e.data.reduce((sum, d) => sum + (d.devolutionItems || 0), 0),
+        0
+      );
+      return { employees, totalItems, totalDevolutionItems };
     };
 
     const fetchData = async (store) => {
@@ -2032,6 +2051,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
               id: "$_id",
               employee: 1,
               items: 1,
+              devolutionItems: 1,
               createdAt: 1,
               week: { $isoWeek: "$createdAt" },
             },
@@ -2040,6 +2060,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
             $group: {
               _id: { week: "$week", employee: "$employee" },
               totalItems: { $sum: "$items" },
+              totalDevolutionItems: { $sum: "$devolutionItems" },
               minDate: { $min: "$createdAt" },
               maxDate: { $max: "$createdAt" },
             },
@@ -2062,6 +2083,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
             $group: {
               _id: { employee: "$employee" },
               totalItems: { $sum: "$items" },
+              totalDevolutionItems: { $sum: "$devolutionItems" },
             },
           },
         ]),
@@ -2079,6 +2101,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
             $group: {
               _id: { employee: "$employee" },
               totalItems: { $sum: "$items" },
+              totalDevolutionItems: { $sum: "$devolutionItems" },
             },
           },
         ]),
@@ -2094,6 +2117,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
             $group: {
               _id: { employee: "$employee" },
               totalItems: { $sum: "$items" },
+              totalDevolutionItems: { $sum: "$devolutionItems" },
             },
           },
         ]),
@@ -2136,12 +2160,21 @@ Controllers.getReportsByEmployees = async (req, res) => {
         const envio = byItemShipmentEnvio.find((e) => e._id.employee === name);
 
         const data = [
-          { concept: "Venta local", items: saleLocal?.totalItems || 0 },
+          {
+            concept: "Venta local",
+            items: saleLocal?.totalItems || 0,
+            devolutionItems: saleLocal?.totalDevolutionItems || 0,
+          },
           {
             concept: "Pedido (Retira local)",
             items: retiroLocal?.totalItems || 0,
+            devolutionItems: retiroLocal?.totalDevolutionItems || 0,
           },
-          { concept: "Pedido (Envio)", items: envio?.totalItems || 0 },
+          {
+            concept: "Pedido (Envio)",
+            items: envio?.totalItems || 0,
+            devolutionItems: envio?.totalDevolutionItems || 0,
+          },
         ];
 
         byItemConceptMap.set(name, {
@@ -2162,9 +2195,9 @@ Controllers.getReportsByEmployees = async (req, res) => {
 
       // Construir byItemConcept (resumen por concepto)
       const concepts = [
-        { concept: "Venta local", items: 0 },
-        { concept: "Pedido (Retira local)", items: 0 },
-        { concept: "Pedido (Envio)", items: 0 },
+        { concept: "Venta local", items: 0, devolutionItems: 0 },
+        { concept: "Pedido (Retira local)", items: 0, devolutionItems: 0 },
+        { concept: "Pedido (Envio)", items: 0, devolutionItems: 0 },
       ];
 
       for (const emp of byItemConceptEmployees) {
@@ -2172,6 +2205,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
           const conceptEntry = concepts.find((c) => c.concept === item.concept);
           if (conceptEntry) {
             conceptEntry.items += item.items;
+            conceptEntry.devolutionItems += item.devolutionItems || 0;
           }
         }
       }
@@ -2183,6 +2217,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
           formatResult(byItemWeek, (e) => ({
             week: e._id.week,
             items: e.totalItems,
+            devolutionItems: e.totalDevolutionItems || 0,
             weekdays: `${e._id.week} (${formatDateDM(e.minDate)}-${formatDateDM(
               e.maxDate
             )})`,
@@ -2190,14 +2225,20 @@ Controllers.getReportsByEmployees = async (req, res) => {
         ),
         byItemShipmentRetiraLocal: formatResult(
           byItemShipmentRetiraLocal,
-          (e) => ({ typeShipment: "retiroLocal", items: e.totalItems })
+          (e) => ({
+            typeShipment: "retiroLocal",
+            items: e.totalItems,
+            devolutionItems: e.totalDevolutionItems || 0,
+          })
         ),
         byItemShipmentEnvio: formatResult(byItemShipmentEnvio, (e) => ({
           typeShipment: "envio",
           items: e.totalItems,
+          devolutionItems: e.totalDevolutionItems || 0,
         })),
         byItemSaleLocal: formatResult(byItemSaleLocal, (e) => ({
           items: e.totalItems,
+          devolutionItems: e.totalDevolutionItems || 0,
         })),
         byQuantitySalePedido: formatResult(byQuantitySalePedido, (e) => ({
           quantity: e.total,
@@ -2209,6 +2250,10 @@ Controllers.getReportsByEmployees = async (req, res) => {
         byItemConcept: {
           concepts,
           totalItems: totalItemsByConcept,
+          totalDevolutionItems: concepts.reduce(
+            (acc, c) => acc + c.devolutionItems,
+            0
+          ),
         },
       };
     };

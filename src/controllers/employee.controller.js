@@ -19,6 +19,7 @@ const getAllEmployees = async (store = "ALL") => {
         activeForCost: 1,
         store: 1,
         position: 1,
+        saleType: { $ifNull: ["$saleType", "ambos"] },
         _id: 0,
       },
     },
@@ -42,7 +43,7 @@ Controllers.getAllByUser = async (req, res) => {
 
 Controllers.create = async (req, res) => {
   try {
-    const { name, store, position, active, activeForCost } = req.body;
+    const { name, store, position, active, activeForCost, saleType } = req.body;
 
     await Employee.create({
       name,
@@ -50,6 +51,7 @@ Controllers.create = async (req, res) => {
       active,
       position,
       activeForCost,
+      saleType: saleType || "ambos",
     });
 
     const employee = await getAllEmployees();
@@ -79,7 +81,7 @@ Controllers.addNewNumOrder = async (req, res) => {
 
 Controllers.update = async (req, res) => {
   try {
-    const { id, name, store, position, active, activeForCost } = req.body;
+    const { id, name, store, position, active, activeForCost, saleType } = req.body;
 
     const employees = await getAllEmployees();
 
@@ -90,7 +92,7 @@ Controllers.update = async (req, res) => {
 
     const updatedEmployee = await Employee.findByIdAndUpdate(
       { _id: id },
-      { name, store, position, active, activeForCost }
+      { name, store, position, active, activeForCost, saleType: saleType || "ambos" }
     );
 
     if (updatedEmployee) {
