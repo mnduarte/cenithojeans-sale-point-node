@@ -17,6 +17,72 @@ const now = new Date();
 const fifteenDaysAgo = new Date();
 fifteenDaysAgo.setDate(now.getDate() - 15);
 
+// ==================== FUNCIÓN DE NORMALIZACIÓN PARA DATOS ANTIGUOS ====================
+const normalizeSaleData = (sale) => {
+  const normalized = { ...sale };
+
+  // Normalizar items
+  if (
+    (normalized.itemsJeans || 0) + (normalized.itemsRemeras || 0) === 0 &&
+    (normalized.items || 0) > 0
+  ) {
+    normalized.itemsJeans = normalized.items;
+    normalized.itemsRemeras = 0;
+  }
+
+  // Normalizar items devolución
+  if (
+    (normalized.itemsDevolutionJeans || 0) +
+      (normalized.itemsDevolutionRemeras || 0) ===
+      0 &&
+    (normalized.devolutionItems || 0) > 0
+  ) {
+    normalized.itemsDevolutionJeans = normalized.devolutionItems;
+    normalized.itemsDevolutionRemeras = 0;
+  }
+
+  // Normalizar cash
+  if (
+    (normalized.subTotalCashJeans || 0) +
+      (normalized.subTotalCashRemeras || 0) ===
+      0 &&
+    (normalized.cash || 0) > 0
+  ) {
+    normalized.subTotalCashJeans = normalized.cash;
+    normalized.subTotalCashRemeras = 0;
+  }
+
+  // Normalizar transfer
+  if (
+    (normalized.subTotalTransferJeans || 0) +
+      (normalized.subTotalTransferRemeras || 0) ===
+      0 &&
+    (normalized.transfer || 0) > 0
+  ) {
+    normalized.subTotalTransferJeans = normalized.transfer;
+    normalized.subTotalTransferRemeras = 0;
+  }
+
+  // Normalizar devoluciones montos
+  const totalDevBreakdown =
+    (normalized.subTotalDevolutionCashJeans || 0) +
+    (normalized.subTotalDevolutionCashRemeras || 0) +
+    (normalized.subTotalDevolutionTransferJeans || 0) +
+    (normalized.subTotalDevolutionTransferRemeras || 0);
+
+  if (
+    totalDevBreakdown === 0 &&
+    (normalized.subTotalDevolutionItems || 0) > 0
+  ) {
+    normalized.subTotalDevolutionCashJeans = normalized.subTotalDevolutionItems;
+    normalized.subTotalDevolutionCashRemeras = 0;
+    normalized.subTotalDevolutionTransferJeans = 0;
+    normalized.subTotalDevolutionTransferRemeras = 0;
+  }
+
+  return normalized;
+};
+
 const getAllEmployees = async (store = "ALL") => {
   const filter = store === "ALL" ? {} : { store };
 
@@ -507,15 +573,17 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
     const getSalesByEmployees = {};
 
     sales
-      .map((sale) => ({
-        ...sale,
-        cash:
-          !Boolean(sale.cash) && !Boolean(sale.transfer)
-            ? sale.total
-            : sale.cash,
-        isSale: true,
-        withFlag: Number(sale.transfer || 0) > 0,
-      }))
+      .map((sale) =>
+        normalizeSaleData({
+          ...sale,
+          cash:
+            !Boolean(sale.cash) && !Boolean(sale.transfer)
+              ? sale.total
+              : sale.cash,
+          isSale: true,
+          withFlag: Number(sale.transfer || 0) > 0,
+        })
+      )
       .forEach((sale) => {
         getSalesByEmployees[sale.employee]
           ? getSalesByEmployees[sale.employee].push(sale)
@@ -535,9 +603,11 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       });
 
     ordersWithPrepaid
-      .map((order) => ({
-        ...order,
-      }))
+      .map((order) =>
+        normalizeSaleData({
+          ...order,
+        })
+      )
       .forEach((order) => {
         getSalesByEmployees[order.employee]
           ? getSalesByEmployees[order.employee].push(order)
@@ -545,9 +615,11 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       });
 
     orders
-      .map((order) => ({
-        ...order,
-      }))
+      .map((order) =>
+        normalizeSaleData({
+          ...order,
+        })
+      )
       .forEach((order) => {
         getSalesByEmployees[order.employee]
           ? getSalesByEmployees[order.employee].push(order)
@@ -684,7 +756,8 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
 
     const employees = await getAllEmployees();
 
-    const joinedSales = [...sales, ...cashflowWrapper]
+    const normalizedSales = sales.map((sale) => normalizeSaleData(sale));
+    const joinedSales = [...normalizedSales, ...cashflowWrapper]
       .map((sale) => {
         const findDetailFromEmployee = employees.find(
           (emp) => sale.employee === emp.name
@@ -759,17 +832,21 @@ Controllers.getSalesWithDevolutions = async (req, res) => {
     ]);
 
     // Agregar campos calculados para montos totales de devolución por tipo
-    const salesWithTotals = sales.map((sale) => ({
-      ...sale,
-      // Monto total devolución jeans (cash + transfer)
-      montoDevolucionJeans:
-        (sale.subTotalDevolutionCashJeans || 0) +
-        (sale.subTotalDevolutionTransferJeans || 0),
-      // Monto total devolución remeras (cash + transfer)
-      montoDevolucionRemeras:
-        (sale.subTotalDevolutionCashRemeras || 0) +
-        (sale.subTotalDevolutionTransferRemeras || 0),
-    }));
+    const salesWithTotals = sales.map((sale) => {
+      const normalized = normalizeSaleData(sale);
+      return {
+        ...normalized,
+        ...sale,
+        // Monto total devolución jeans (cash + transfer)
+        montoDevolucionJeans:
+          (sale.subTotalDevolutionCashJeans || 0) +
+          (sale.subTotalDevolutionTransferJeans || 0),
+        // Monto total devolución remeras (cash + transfer)
+        montoDevolucionRemeras:
+          (sale.subTotalDevolutionCashRemeras || 0) +
+          (sale.subTotalDevolutionTransferRemeras || 0),
+      };
+    });
 
     const employees = await getAllEmployees();
 
