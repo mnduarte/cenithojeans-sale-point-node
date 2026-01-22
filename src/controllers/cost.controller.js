@@ -136,6 +136,24 @@ Controllers.getCosts = async (req, res) => {
             },
           },
           _id: 0,
+          dateCashierId: 1,
+          dateCashierName: 1,
+          accountCashierId: 1,
+          accountCashierName: 1,
+          numOrderCashierId: 1,
+          numOrderCashierName: 1,
+          amountCashierId: 1,
+          amountCashierName: 1,
+          approvedCashierId: 1,
+          approvedCashierName: 1,
+          dateApprovedCashierId: 1,
+          dateApprovedCashierName: 1,
+          employeeCashierId: 1,
+          employeeCashierName: 1,
+          customerCashierId: 1,
+          customerCashierName: 1,
+          typeShipmentCashierId: 1,
+          typeShipmentCashierName: 1,
         },
       },
     ]);
@@ -232,6 +250,24 @@ Controllers.getCostsByDateApproved = async (req, res) => {
             },
           },
           _id: 0,
+          dateCashierId: 1,
+          dateCashierName: 1,
+          accountCashierId: 1,
+          accountCashierName: 1,
+          numOrderCashierId: 1,
+          numOrderCashierName: 1,
+          amountCashierId: 1,
+          amountCashierName: 1,
+          approvedCashierId: 1,
+          approvedCashierName: 1,
+          dateApprovedCashierId: 1,
+          dateApprovedCashierName: 1,
+          employeeCashierId: 1,
+          employeeCashierName: 1,
+          customerCashierId: 1,
+          customerCashierName: 1,
+          typeShipmentCashierId: 1,
+          typeShipmentCashierName: 1,
         },
       },
       { $sort: { numOrder: 1, employee: 1 } },
@@ -387,6 +423,7 @@ Controllers.update = async (req, res) => {
       lastEditCashierName,
       checkoutCashierId,
       checkoutCashierName,
+      editedField, // Nuevo: campo que se editó
     } = req.body;
 
     const propsCost = {
@@ -402,13 +439,42 @@ Controllers.update = async (req, res) => {
       checkoutDate: formatDate(checkoutDate),
     };
 
-    // Agregar cajero que editó
+    // Mapeo de campo editado a campos de cajero específicos
+    const cashierFieldMap = {
+      date: { id: "dateCashierId", name: "dateCashierName" },
+      account: { id: "accountCashierId", name: "accountCashierName" },
+      numOrder: { id: "numOrderCashierId", name: "numOrderCashierName" },
+      amount: { id: "amountCashierId", name: "amountCashierName" },
+      approved: { id: "approvedCashierId", name: "approvedCashierName" },
+      dateApproved: {
+        id: "dateApprovedCashierId",
+        name: "dateApprovedCashierName",
+      },
+      employee: { id: "employeeCashierId", name: "employeeCashierName" },
+      customer: { id: "customerCashierId", name: "customerCashierName" },
+      typeShipment: {
+        id: "typeShipmentCashierId",
+        name: "typeShipmentCashierName",
+      },
+      checkoutDate: { id: "checkoutCashierId", name: "checkoutCashierName" },
+    };
+
+    // Si hay cajero y campo editado, guardar en el campo específico
+    if (lastEditCashierId && editedField) {
+      const mapping = cashierFieldMap[editedField];
+      if (mapping) {
+        propsCost[mapping.id] = lastEditCashierId;
+        propsCost[mapping.name] = lastEditCashierName;
+      }
+    }
+
+    // Mantener lastEdit como respaldo/histórico general
     if (lastEditCashierId) {
       propsCost.lastEditCashierId = lastEditCashierId;
       propsCost.lastEditCashierName = lastEditCashierName;
     }
 
-    // Agregar cajero que marcó salida
+    // Cajero de checkoutDate (caso especial que ya venía separado)
     if (checkoutCashierId) {
       propsCost.checkoutCashierId = checkoutCashierId;
       propsCost.checkoutCashierName = checkoutCashierName;
@@ -447,6 +513,25 @@ Controllers.update = async (req, res) => {
     const transformedResults = {
       ...costToUpdate._doc,
       id: costToUpdate._id,
+      // Cajeros por campo
+      dateCashierId: costToUpdate.dateCashierId,
+      dateCashierName: costToUpdate.dateCashierName,
+      accountCashierId: costToUpdate.accountCashierId,
+      accountCashierName: costToUpdate.accountCashierName,
+      numOrderCashierId: costToUpdate.numOrderCashierId,
+      numOrderCashierName: costToUpdate.numOrderCashierName,
+      amountCashierId: costToUpdate.amountCashierId,
+      amountCashierName: costToUpdate.amountCashierName,
+      approvedCashierId: costToUpdate.approvedCashierId,
+      approvedCashierName: costToUpdate.approvedCashierName,
+      dateApprovedCashierId: costToUpdate.dateApprovedCashierId,
+      dateApprovedCashierName: costToUpdate.dateApprovedCashierName,
+      employeeCashierId: costToUpdate.employeeCashierId,
+      employeeCashierName: costToUpdate.employeeCashierName,
+      customerCashierId: costToUpdate.customerCashierId,
+      customerCashierName: costToUpdate.customerCashierName,
+      typeShipmentCashierId: costToUpdate.typeShipmentCashierId,
+      typeShipmentCashierName: costToUpdate.typeShipmentCashierName,
     };
 
     /* ACTUALIZA ORDEN */

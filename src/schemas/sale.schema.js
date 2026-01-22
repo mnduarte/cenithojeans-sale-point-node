@@ -182,6 +182,56 @@ const SaleSchema = mongoose.Schema(
     checkoutCashierName: {
       type: String,
     },
+    // Cajero por campo editable
+    employeeCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    employeeCashierName: {
+      type: String,
+    },
+    orderCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    orderCashierName: {
+      type: String,
+    },
+    typeShipmentCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    typeShipmentCashierName: {
+      type: String,
+    },
+    transferCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    transferCashierName: {
+      type: String,
+    },
+    cashFieldCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    cashFieldCashierName: {
+      type: String,
+    },
+    itemsCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    itemsCashierName: {
+      type: String,
+    },
+    totalCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    totalCashierName: {
+      type: String,
+    },
   },
   {
     timestamps: {
