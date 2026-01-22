@@ -77,6 +77,69 @@ const CostSchema = mongoose.Schema(
     checkoutCashierName: {
       type: String,
     },
+    dateCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    dateCashierName: {
+      type: String,
+    },
+    accountCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    accountCashierName: {
+      type: String,
+    },
+    numOrderCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    numOrderCashierName: {
+      type: String,
+    },
+    amountCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    amountCashierName: {
+      type: String,
+    },
+    approvedCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    approvedCashierName: {
+      type: String,
+    },
+    dateApprovedCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    dateApprovedCashierName: {
+      type: String,
+    },
+    employeeCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    employeeCashierName: {
+      type: String,
+    },
+    customerCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    customerCashierName: {
+      type: String,
+    },
+    typeShipmentCashierId: {
+      type: Number,
+      ref: "Cashier",
+    },
+    typeShipmentCashierName: {
+      type: String,
+    },
   },
   {
     timestamps: {

@@ -257,6 +257,20 @@ Controllers.getOrders = async (req, res) => {
             },
           },
           _id: 1,
+          employeeCashierId: 1,
+          employeeCashierName: 1,
+          orderCashierId: 1,
+          orderCashierName: 1,
+          typeShipmentCashierId: 1,
+          typeShipmentCashierName: 1,
+          transferCashierId: 1,
+          transferCashierName: 1,
+          cashFieldCashierId: 1,
+          cashFieldCashierName: 1,
+          itemsCashierId: 1,
+          itemsCashierName: 1,
+          totalCashierId: 1,
+          totalCashierName: 1,
         },
       },
     ]);
@@ -358,6 +372,20 @@ Controllers.getOrdersCheckoutDate = async (req, res) => {
             },
           },
           _id: 0,
+          employeeCashierId: 1,
+          employeeCashierName: 1,
+          orderCashierId: 1,
+          orderCashierName: 1,
+          typeShipmentCashierId: 1,
+          typeShipmentCashierName: 1,
+          transferCashierId: 1,
+          transferCashierName: 1,
+          cashFieldCashierId: 1,
+          cashFieldCashierName: 1,
+          itemsCashierId: 1,
+          itemsCashierName: 1,
+          totalCashierId: 1,
+          totalCashierName: 1,
         },
       },
     ]);
@@ -2527,15 +2555,30 @@ Controllers.updateOrder = async (req, res) => {
 
     // Si hay cajero seleccionado, actualizar según el tipo de campo
     if (cashierId && cashierName) {
-      if (dataIndex === "checkoutDate") {
-        // Campo de salida: guardar en checkoutCashier
-        saleToUpdate.checkoutCashierId = cashierId;
-        saleToUpdate.checkoutCashierName = cashierName;
-      } else {
-        // Otros campos editables: guardar en lastEditCashier
-        saleToUpdate.lastEditCashierId = cashierId;
-        saleToUpdate.lastEditCashierName = cashierName;
+      // Mapeo de dataIndex a campos de cajero específicos
+      const cashierFieldMap = {
+        employee: { id: "employeeCashierId", name: "employeeCashierName" },
+        order: { id: "orderCashierId", name: "orderCashierName" },
+        typeShipment: {
+          id: "typeShipmentCashierId",
+          name: "typeShipmentCashierName",
+        },
+        transfer: { id: "transferCashierId", name: "transferCashierName" },
+        cash: { id: "cashFieldCashierId", name: "cashFieldCashierName" },
+        items: { id: "itemsCashierId", name: "itemsCashierName" },
+        total: { id: "totalCashierId", name: "totalCashierName" },
+        checkoutDate: { id: "checkoutCashierId", name: "checkoutCashierName" },
+      };
+
+      const mapping = cashierFieldMap[dataIndex];
+      if (mapping) {
+        saleToUpdate[mapping.id] = cashierId;
+        saleToUpdate[mapping.name] = cashierName;
       }
+
+      // Mantener lastEdit como respaldo/histórico general
+      saleToUpdate.lastEditCashierId = cashierId;
+      saleToUpdate.lastEditCashierName = cashierName;
     }
 
     if (dataIndex === "cash") {
@@ -2621,6 +2664,20 @@ Controllers.updateOrder = async (req, res) => {
       lastEditCashierName: saleToUpdate.lastEditCashierName,
       checkoutCashierId: saleToUpdate.checkoutCashierId,
       checkoutCashierName: saleToUpdate.checkoutCashierName,
+      employeeCashierId: saleToUpdate.employeeCashierId,
+      employeeCashierName: saleToUpdate.employeeCashierName,
+      orderCashierId: saleToUpdate.orderCashierId,
+      orderCashierName: saleToUpdate.orderCashierName,
+      typeShipmentCashierId: saleToUpdate.typeShipmentCashierId,
+      typeShipmentCashierName: saleToUpdate.typeShipmentCashierName,
+      transferCashierId: saleToUpdate.transferCashierId,
+      transferCashierName: saleToUpdate.transferCashierName,
+      cashFieldCashierId: saleToUpdate.cashFieldCashierId,
+      cashFieldCashierName: saleToUpdate.cashFieldCashierName,
+      itemsCashierId: saleToUpdate.itemsCashierId,
+      itemsCashierName: saleToUpdate.itemsCashierName,
+      totalCashierId: saleToUpdate.totalCashierId,
+      totalCashierName: saleToUpdate.totalCashierName,
     };
 
     if (saleToUpdate.checkoutDate) {
@@ -2647,13 +2704,41 @@ Controllers.updateSaleByEmployee = async (req, res) => {
 
     saleToUpdate[dataIndex] = value;
 
+    // ==================== LÓGICA PARA CAMPOS NUEVOS ====================
+
+    // Si actualiza cash, también actualizar subTotalCashJeans (retrocompatibilidad)
     if (dataIndex === "cash") {
-      saleToUpdate.total = saleToUpdate.transfer + value;
+      saleToUpdate.total = (saleToUpdate.transfer || 0) + value;
+      // Asignar a jeans por defecto (consistente con regla de negocio)
+      saleToUpdate.subTotalCashJeans = value;
+      saleToUpdate.subTotalCashRemeras = 0;
     }
 
+    // Si actualiza transfer, también actualizar subTotalTransferJeans
     if (dataIndex === "transfer") {
-      saleToUpdate.total = saleToUpdate.cash + value;
+      saleToUpdate.total = (saleToUpdate.cash || 0) + value;
+      // Asignar a jeans por defecto
+      saleToUpdate.subTotalTransferJeans = value;
+      saleToUpdate.subTotalTransferRemeras = 0;
     }
+
+    // Si actualiza itemsJeans, recalcular items total
+    if (dataIndex === "itemsJeans") {
+      saleToUpdate.items = value + (saleToUpdate.itemsRemeras || 0);
+    }
+
+    // Si actualiza itemsRemeras, recalcular items total
+    if (dataIndex === "itemsRemeras") {
+      saleToUpdate.items = (saleToUpdate.itemsJeans || 0) + value;
+    }
+
+    // Si actualiza items directamente (modo legacy), asignar todo a jeans
+    if (dataIndex === "items") {
+      saleToUpdate.itemsJeans = value;
+      saleToUpdate.itemsRemeras = 0;
+    }
+
+    // ==================== FIN LÓGICA CAMPOS NUEVOS ====================
 
     await saleToUpdate.save();
 

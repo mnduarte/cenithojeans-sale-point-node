@@ -19,6 +19,7 @@ const getAllCashiers = async (store = "ALL") => {
         color: 1,
         position: 1,
         active: 1,
+        isAdmin: 1,
         _id: 0,
       },
     },
@@ -59,7 +60,7 @@ Controllers.getAll = async (req, res) => {
 
 Controllers.create = async (req, res) => {
   try {
-    const { name, store, color, position } = req.body;
+    const { name, store, color, position, isAdmin } = req.body;
 
     await Cashier.create({
       name,
@@ -67,6 +68,7 @@ Controllers.create = async (req, res) => {
       color,
       position,
       active: true,
+      isAdmin: isAdmin || false,
     });
 
     const cashiers = await getAllCashiers("ALL");
@@ -82,27 +84,35 @@ Controllers.create = async (req, res) => {
 
 Controllers.update = async (req, res) => {
   try {
-    const { id, name, store, color, position, active } = req.body;
+    const { id, name, store, color, position, active, isAdmin } = req.body;
 
-    const cashiers = await getAllCashiers("ALL");
+    // Validar que id existe
+    if (!id) {
+      return res.status(400).json({ message: "ID de cajero requerido" });
+    }
+
+    // Obtener el schema directamente para evitar sanitize con $ne
+    const CashierSchema = require("../schemas/cashier.schema");
 
     // Si hay otro cajero en esa posición, lo movemos
-    await Cashier.findOneAndUpdate(
+    const cashiersCount = await CashierSchema.countDocuments({
+      active: { $ne: false },
+    });
+    await CashierSchema.findOneAndUpdate(
       { position, _id: { $ne: id } },
-      { position: cashiers.length }
+      { position: cashiersCount }
     );
 
-    const updatedCashier = await Cashier.findByIdAndUpdate(
-      { _id: id },
-      { name, store, color, position, active }
+    // Actualizar el cajero
+    const updatedCashier = await CashierSchema.findByIdAndUpdate(
+      id,
+      { name, store, color, position, active, isAdmin },
+      { new: true }
     );
 
     if (updatedCashier) {
       const cashiers = await getAllCashiers("ALL");
-
-      res.send({
-        results: cashiers,
-      });
+      res.send({ results: cashiers });
     } else {
       res.status(404).json({ message: "Cajero no encontrado" });
     }
