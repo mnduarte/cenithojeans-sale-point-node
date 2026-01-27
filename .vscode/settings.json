@@ -4,5 +4,6 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
   },
-  "cSpell.words": ["Ccxt"]
+  "cSpell.words": ["Ccxt"],
+  "snyk.advanced.autoSelectOrganization": true
 }
