@@ -2,36 +2,14 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch Node nodemon",
-      "program": "${workspaceFolder}/app.js",
+      "name": "Debug con Nodemon",
+      "type": "node",
       "request": "launch",
-      "skipFiles": ["<node_internals>/**"],
-      "type": "node",
-      "env": {
-        "MONGO_DB_HOST": "0.0.0.0",
-        "MONGO_DB_NAME": "it-crowd",
-        "HOST": "0.0.0.0",
-        "PORT": "30040",
-        "IT_CROWD_ENV": "local",
-        "NODE_ENV": "local",
-        "JWT_SECRET": "11m1h2h3u4wegkgh"
-      }
-    },
-    {
-      "name": "Attach",
-      "port": 30040,
-      "request": "attach",
-      "skipFiles": ["<node_internals>/**"],
-      "type": "node"
-    },
-    {
-      "name": "Docker: Attach to Node",
-      "type": "node",
-      "request": "attach",
-      "port": 30041,
-      "address": "localhost",
-      "localRoot": "${workspaceFolder}",
-      "remoteRoot": "/app"
+      "runtimeExecutable": "nodemon",
+      "program": "${workspaceFolder}/app.js",
+      "restart": true,
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
     }
   ]
 }

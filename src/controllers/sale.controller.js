@@ -110,7 +110,7 @@ Controllers.getSales = async (req, res) => {
     const { startDate, endDate, store, employee } = req.query;
 
     const addOneDayDate = new Date(
-      new Date(endDate).setDate(new Date(endDate).getDate() + 1)
+      new Date(endDate).setDate(new Date(endDate).getDate() + 1),
     );
 
     const query = {
@@ -181,7 +181,7 @@ Controllers.getOrders = async (req, res) => {
     } = req.query;
 
     const addOneDayDate = new Date(
-      new Date(endDate).setDate(new Date(endDate).getDate() + 1)
+      new Date(endDate).setDate(new Date(endDate).getDate() + 1),
     );
 
     const query = {
@@ -312,7 +312,7 @@ Controllers.getOrdersCheckoutDate = async (req, res) => {
       req.query;
 
     const addOneDayDate = new Date(
-      new Date(endDate).setDate(new Date(endDate).getDate() + 1)
+      new Date(endDate).setDate(new Date(endDate).getDate() + 1),
     );
 
     const query = {
@@ -402,7 +402,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
     const { date, store } = req.query;
 
     const addOneDayDate = new Date(
-      new Date(date).setDate(new Date(date).getDate() + 1)
+      new Date(date).setDate(new Date(date).getDate() + 1),
     );
 
     const cashflows = await Cashflow.aggregate([
@@ -610,7 +610,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
               : sale.cash,
           isSale: true,
           withFlag: Number(sale.transfer || 0) > 0,
-        })
+        }),
       )
       .forEach((sale) => {
         getSalesByEmployees[sale.employee]
@@ -634,7 +634,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       .map((order) =>
         normalizeSaleData({
           ...order,
-        })
+        }),
       )
       .forEach((order) => {
         getSalesByEmployees[order.employee]
@@ -646,7 +646,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       .map((order) =>
         normalizeSaleData({
           ...order,
-        })
+        }),
       )
       .forEach((order) => {
         getSalesByEmployees[order.employee]
@@ -659,12 +659,23 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
     const sortEmployeeByPosition = employees.sort(
       (a, b) =>
         (a.position || employees.length + 1) -
-        (b.position || employees.length + 1)
+        (b.position || employees.length + 1),
     );
+
+    // Primero agregar empleados que existen en la lista (ordenados por posición)
     sortEmployeeByPosition.forEach((employee) => {
       if (getSalesByEmployees[employee.name]) {
         reOrderSalesByEmployees[employee.name] =
           getSalesByEmployees[employee.name];
+      }
+    });
+
+    // Después agregar empleados que tienen ventas pero no existen en la lista
+    // (empleados eliminados o no encontrados - se agregan al final)
+    Object.keys(getSalesByEmployees).forEach((employeeName) => {
+      if (!reOrderSalesByEmployees[employeeName]) {
+        reOrderSalesByEmployees[employeeName] =
+          getSalesByEmployees[employeeName];
       }
     });
 
@@ -680,7 +691,7 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
     const { date, store } = req.query;
 
     const addOneDayDate = new Date(
-      new Date(date).setDate(new Date(date).getDate() + 1)
+      new Date(date).setDate(new Date(date).getDate() + 1),
     );
 
     const query = {
@@ -788,15 +799,15 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
     const joinedSales = [...normalizedSales, ...cashflowWrapper]
       .map((sale) => {
         const findDetailFromEmployee = employees.find(
-          (emp) => sale.employee === emp.name
+          (emp) => sale.employee === emp.name,
         );
 
-        return { ...sale, position: findDetailFromEmployee.position };
+        return { ...sale, position: findDetailFromEmployee?.position || 999 };
       })
       .sort(
         (a, b) =>
           (a.position || employees.length + 1) -
-          (b.position || employees.length + 1)
+          (b.position || employees.length + 1),
       );
 
     res.send({ results: joinedSales });
@@ -812,7 +823,7 @@ Controllers.getSalesWithDevolutions = async (req, res) => {
     const { date, store } = req.query;
 
     const addOneDayDate = new Date(
-      new Date(date).setDate(new Date(date).getDate() + 1)
+      new Date(date).setDate(new Date(date).getDate() + 1),
     );
 
     const query = {
@@ -881,14 +892,14 @@ Controllers.getSalesWithDevolutions = async (req, res) => {
     const salesWithPosition = salesWithTotals
       .map((sale) => {
         const findDetailFromEmployee = employees.find(
-          (emp) => sale.employee === emp.name
+          (emp) => sale.employee === emp.name,
         );
         return { ...sale, position: findDetailFromEmployee?.position || 999 };
       })
       .sort(
         (a, b) =>
           (a.position || employees.length + 1) -
-          (b.position || employees.length + 1)
+          (b.position || employees.length + 1),
       );
 
     res.send({ results: salesWithPosition });
@@ -1593,40 +1604,38 @@ Controllers.getReports = async (req, res) => {
 
       salesByDays.forEach((resumeWeek) => {
         weekWithDays[resumeWeek.week] = resumeWeek.salesGeneral.map(
-          ({ date }) => date
+          ({ date }) => date,
         );
       });
 
       const salesGeneral = salesByDays.map((resumeWeek) => {
         const weekSalesByEmployees = salesByEmployees.find(
-          ({ week }) => week === resumeWeek.week
+          ({ week }) => week === resumeWeek.week,
         );
 
         resumeWeek.salesByEmployees = weekSalesByEmployees.employees
           .map((saleByEmployee) => {
             const findDetailFromEmployee = employees.find(
-              (emp) => saleByEmployee.employee === emp.name
+              (emp) => saleByEmployee.employee === emp.name,
             );
 
             return {
               employee: saleByEmployee.employee,
-              position: findDetailFromEmployee
-                ? findDetailFromEmployee.position
-                : employees.length,
+              position: findDetailFromEmployee?.position || 999,
               sales: weekWithDays[resumeWeek.week].map((day) => {
                 const foundSale = saleByEmployee.days.find(
-                  (s) => s.date === day
+                  (s) => s.date === day,
                 );
 
                 const weekIncomesByEmployee =
                   cashflowsResumeIncomesByEmployee.find(
-                    (e) => e.week === resumeWeek.week
+                    (e) => e.week === resumeWeek.week,
                   );
 
                 if (!!weekIncomesByEmployee) {
                   const foundEmployeeIncome =
                     weekIncomesByEmployee.employees.find(
-                      (e) => e.employee === saleByEmployee.employee
+                      (e) => e.employee === saleByEmployee.employee,
                     );
 
                   if (foundEmployeeIncome) {
@@ -1644,17 +1653,17 @@ Controllers.getReports = async (req, res) => {
                 }
 
                 const weekOrdersByEmployee = ordersByEmployees.find(
-                  (e) => e.week === resumeWeek.week
+                  (e) => e.week === resumeWeek.week,
                 );
 
                 if (!!weekOrdersByEmployee) {
                   const foundEmployee = weekOrdersByEmployee.employees.find(
-                    (e) => e.employee === saleByEmployee.employee
+                    (e) => e.employee === saleByEmployee.employee,
                   );
 
                   if (foundEmployee) {
                     const foundDayByEmployee = foundEmployee.days.find(
-                      (e) => e.date === day
+                      (e) => e.date === day,
                     );
 
                     if (foundDayByEmployee && foundSale) {
@@ -1668,18 +1677,18 @@ Controllers.getReports = async (req, res) => {
 
                 const weekOrdersWithPrepaidByEmployee =
                   ordersWithPrepaidByEmployees.find(
-                    (e) => e.week === resumeWeek.week
+                    (e) => e.week === resumeWeek.week,
                   );
 
                 if (!!weekOrdersWithPrepaidByEmployee) {
                   const foundEmployee =
                     weekOrdersWithPrepaidByEmployee.employees.find(
-                      (e) => e.employee === saleByEmployee.employee
+                      (e) => e.employee === saleByEmployee.employee,
                     );
 
                   if (foundEmployee) {
                     const foundDayByEmployee = foundEmployee.days.find(
-                      (e) => e.date === day
+                      (e) => e.date === day,
                     );
 
                     if (foundDayByEmployee && foundSale) {
@@ -1707,25 +1716,25 @@ Controllers.getReports = async (req, res) => {
           .sort(
             (a, b) =>
               (a.position || employees.length + 1) -
-              (b.position || employees.length + 1)
+              (b.position || employees.length + 1),
           );
 
         //Maneja Ingreso Total Diario
         const cashflowByWeekIncome = cashflowsResumeIncomes.find(
-          (cashflow) => cashflow.week === resumeWeek.week
+          (cashflow) => cashflow.week === resumeWeek.week,
         );
 
         const ordersByWeek = ordersByDays.find(
-          (order) => order.week === resumeWeek.week
+          (order) => order.week === resumeWeek.week,
         );
 
         const ordersWithPrepaidByWeek = ordersWithPrepaid.find(
-          (order) => order.week === resumeWeek.week
+          (order) => order.week === resumeWeek.week,
         );
 
         //Maneja Egresos Total Diario
         const cashflowByWeekOutgoing = cashflowsResumeOutgoings.find(
-          (cashflow) => cashflow.week === resumeWeek.week
+          (cashflow) => cashflow.week === resumeWeek.week,
         );
 
         resumeWeek.salesGeneral.map((sale) => {
@@ -1733,7 +1742,7 @@ Controllers.getReports = async (req, res) => {
 
           if (cashflowByWeekIncome) {
             const cashflowByDay = cashflowByWeekIncome.days.find(
-              (cashflow) => cashflow.date === sale.date
+              (cashflow) => cashflow.date === sale.date,
             );
 
             if (cashflowByDay) {
@@ -1747,7 +1756,7 @@ Controllers.getReports = async (req, res) => {
 
           if (ordersByWeek) {
             const orderByDay = ordersByWeek.salesGeneral.find(
-              (order) => order.date === sale.date
+              (order) => order.date === sale.date,
             );
 
             if (orderByDay) {
@@ -1761,7 +1770,7 @@ Controllers.getReports = async (req, res) => {
 
           if (ordersWithPrepaidByWeek) {
             const orderByDay = ordersWithPrepaidByWeek.salesGeneral.find(
-              (order) => order.date === sale.date
+              (order) => order.date === sale.date,
             );
 
             if (orderByDay) {
@@ -1775,7 +1784,7 @@ Controllers.getReports = async (req, res) => {
 
           if (cashflowByWeekOutgoing) {
             const cashflowByDay = cashflowByWeekOutgoing.days.find(
-              (cashflow) => cashflow.date === sale.date
+              (cashflow) => cashflow.date === sale.date,
             );
             if (cashflowByDay) {
               const saleCash = sale.cash;
@@ -1974,29 +1983,27 @@ Controllers.getReports = async (req, res) => {
 
       salesByDays.forEach((resumeWeek) => {
         weekWithDays[resumeWeek.week] = resumeWeek.salesGeneral.map(
-          ({ date }) => date
+          ({ date }) => date,
         );
       });
 
       const salesGeneral = salesByDays.map((resumeWeek) => {
         const weekSalesByEmployees = salesByEmployees.find(
-          ({ week }) => week === resumeWeek.week
+          ({ week }) => week === resumeWeek.week,
         );
 
         resumeWeek.salesByEmployees = weekSalesByEmployees.employees
           .map((saleByEmployee) => {
             const findDetailFromEmployee = employees.find(
-              (emp) => saleByEmployee.employee === emp.name
+              (emp) => saleByEmployee.employee === emp.name,
             );
 
             return {
               employee: saleByEmployee.employee,
-              position: findDetailFromEmployee
-                ? findDetailFromEmployee.position
-                : 0,
+              position: findDetailFromEmployee?.position || 999,
               sales: weekWithDays[resumeWeek.week].map((day) => {
                 const foundSale = saleByEmployee.days.find(
-                  (s) => s.date === day
+                  (s) => s.date === day,
                 );
 
                 return (
@@ -2015,7 +2022,7 @@ Controllers.getReports = async (req, res) => {
           .sort(
             (a, b) =>
               (a.position || employees.length + 1) -
-              (b.position || employees.length + 1)
+              (b.position || employees.length + 1),
           );
 
         resumeWeek.salesGeneral.map((sale) => {
@@ -2048,7 +2055,7 @@ Controllers.getReports = async (req, res) => {
 
 function normalizeByWeeks(result) {
   const allWeeks = Array.from(
-    new Set(result.employees.flatMap((e) => e.data.map((d) => d.week)))
+    new Set(result.employees.flatMap((e) => e.data.map((d) => d.week))),
   ).sort((a, b) => a - b);
 
   result.employees = result.employees.map((e) => {
@@ -2119,23 +2126,55 @@ Controllers.getReportsByEmployees = async (req, res) => {
         empMap.set(key, current);
       }
       const employees = Array.from(empMap.values()).sort(
-        (a, b) => a.position - b.position
+        (a, b) => a.position - b.position,
       );
       const totalItems = employees.reduce(
         (acc, e) =>
           acc +
           e.data.reduce((sum, d) => sum + (d.items || d.quantity || 0), 0),
-        0
+        0,
       );
       const totalDevolutionItems = employees.reduce(
         (acc, e) =>
           acc + e.data.reduce((sum, d) => sum + (d.devolutionItems || 0), 0),
-        0
+        0,
       );
       return { employees, totalItems, totalDevolutionItems };
     };
 
     const fetchData = async (store) => {
+      // Primero obtener el rango de fechas GLOBAL por semana (no por empleado)
+      const weekRanges = await Sale.aggregate([
+        {
+          $match: buildMatch(store, {
+            typeSale: "local",
+            $or: [{ cash: { $gt: 0 } }, { transfer: { $gt: 0 } }],
+          }),
+        },
+        {
+          $project: {
+            createdAt: 1,
+            week: { $isoWeek: "$createdAt" },
+          },
+        },
+        {
+          $group: {
+            _id: "$week",
+            minDate: { $min: "$createdAt" },
+            maxDate: { $max: "$createdAt" },
+          },
+        },
+      ]);
+
+      // Crear un mapa de semana -> rango de fechas global
+      const weekRangeMap = new Map();
+      for (const wr of weekRanges) {
+        weekRangeMap.set(wr._id, {
+          minDate: wr.minDate,
+          maxDate: wr.maxDate,
+        });
+      }
+
       const [
         byItemWeek,
         byItemShipmentRetiraLocal,
@@ -2166,8 +2205,6 @@ Controllers.getReportsByEmployees = async (req, res) => {
               _id: { week: "$week", employee: "$employee" },
               totalItems: { $sum: "$items" },
               totalDevolutionItems: { $sum: "$devolutionItems" },
-              minDate: { $min: "$createdAt" },
-              maxDate: { $max: "$createdAt" },
             },
           },
           {
@@ -2260,7 +2297,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
 
         const saleLocal = byItemSaleLocal.find((e) => e._id.employee === name);
         const retiroLocal = byItemShipmentRetiraLocal.find(
-          (e) => e._id.employee === name
+          (e) => e._id.employee === name,
         );
         const envio = byItemShipmentEnvio.find((e) => e._id.employee === name);
 
@@ -2290,12 +2327,12 @@ Controllers.getReportsByEmployees = async (req, res) => {
       }
 
       const byItemConceptEmployees = Array.from(byItemConceptMap.values()).sort(
-        (a, b) => a.position - b.position
+        (a, b) => a.position - b.position,
       );
 
       const byItemConceptTotalItems = byItemConceptEmployees.reduce(
         (total, emp) => total + emp.data.reduce((sum, d) => sum + d.items, 0),
-        0
+        0,
       );
 
       // Construir byItemConcept (resumen por concepto)
@@ -2319,14 +2356,17 @@ Controllers.getReportsByEmployees = async (req, res) => {
 
       return {
         byItemWeek: normalizeByWeeks(
-          formatResult(byItemWeek, (e) => ({
-            week: e._id.week,
-            items: e.totalItems,
-            devolutionItems: e.totalDevolutionItems || 0,
-            weekdays: `${e._id.week} (${formatDateDM(e.minDate)}-${formatDateDM(
-              e.maxDate
-            )})`,
-          }))
+          formatResult(byItemWeek, (e) => {
+            const range = weekRangeMap.get(e._id.week);
+            return {
+              week: e._id.week,
+              items: e.totalItems,
+              devolutionItems: e.totalDevolutionItems || 0,
+              weekdays: range
+                ? `${e._id.week} (${formatDateDM(range.minDate)}-${formatDateDM(range.maxDate)})`
+                : `${e._id.week}`,
+            };
+          }),
         ),
         byItemShipmentRetiraLocal: formatResult(
           byItemShipmentRetiraLocal,
@@ -2334,7 +2374,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
             typeShipment: "retiroLocal",
             items: e.totalItems,
             devolutionItems: e.totalDevolutionItems || 0,
-          })
+          }),
         ),
         byItemShipmentEnvio: formatResult(byItemShipmentEnvio, (e) => ({
           typeShipment: "envio",
@@ -2357,7 +2397,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
           totalItems: totalItemsByConcept,
           totalDevolutionItems: concepts.reduce(
             (acc, c) => acc + c.devolutionItems,
-            0
+            0,
           ),
         },
       };
@@ -2439,8 +2479,8 @@ Controllers.create = async (req, res) => {
       lastNumOrder = findEmployee.enableNewNumOrder
         ? findEmployee.newNumOrder
         : !lastSaleByEmployee || lastSaleByEmployee.order >= 100
-        ? 1
-        : lastSaleByEmployee.order + 1;
+          ? 1
+          : lastSaleByEmployee.order + 1;
     }
 
     await Sale.create({
@@ -2510,8 +2550,8 @@ Controllers.createSaleByEmployee = async (req, res) => {
     const numOrderLocal = findEmployee.enableNewNumOrder
       ? findEmployee.newNumOrder
       : !lastSaleByEmployee || lastSaleByEmployee.order >= 100
-      ? 1
-      : lastSaleByEmployee.order + 1;
+        ? 1
+        : lastSaleByEmployee.order + 1;
 
     if (findEmployee.enableNewNumOrder) {
       findEmployee.enableNewNumOrder = false;
@@ -2599,7 +2639,7 @@ Controllers.updateOrder = async (req, res) => {
         {
           approved: 1,
           amount: 1,
-        }
+        },
       );
 
       let totalAmount = 0;
@@ -2625,10 +2665,10 @@ Controllers.updateOrder = async (req, res) => {
           Boolean(totalAmount) && saleToUpdate.transfer > totalAmount
             ? "partialPayment"
             : isApproved && !Boolean(saleToUpdate.cash)
-            ? "approved"
-            : isApproved && Boolean(saleToUpdate.cash)
-            ? "approvedHasCash"
-            : "withoutPayment";
+              ? "approved"
+              : isApproved && Boolean(saleToUpdate.cash)
+                ? "approvedHasCash"
+                : "withoutPayment";
       }
 
       if (!saleToUpdate.transfer) {
@@ -2651,7 +2691,7 @@ Controllers.updateOrder = async (req, res) => {
             items: saleToUpdate.items,
             typeShipment: saleToUpdate.typeShipment,
           },
-        }
+        },
       );
     }
 
@@ -2682,7 +2722,7 @@ Controllers.updateOrder = async (req, res) => {
 
     if (saleToUpdate.checkoutDate) {
       transformedResults.checkoutDate = formatCheckoutDate(
-        saleToUpdate.checkoutDate
+        saleToUpdate.checkoutDate,
       );
     }
 
@@ -2768,7 +2808,7 @@ Controllers.cancelOrders = async (req, res) => {
           cancellationByUser: user,
           cancellationDate: new Date(cancellationDate),
         },
-      }
+      },
     );
 
     const ordersCancelled = await Sale.aggregate([
@@ -2826,7 +2866,7 @@ Controllers.enableOrders = async (req, res) => {
           cancellationByUser: null,
           cancellationDate: null,
         },
-      }
+      },
     );
 
     const ordersCancelled = await Sale.aggregate([
@@ -2882,7 +2922,7 @@ Controllers.removeSales = async (req, res) => {
 
       await Sale.updateMany(
         { _id: { $in: salesIdsToUpdate } },
-        { $set: { cancelled: true } }
+        { $set: { cancelled: true } },
       );
 
       salesCancelled = await Sale.aggregate([
@@ -2912,7 +2952,7 @@ Controllers.removeSales = async (req, res) => {
 
       await Cashflow.updateMany(
         { _id: { $in: chasflowsIdsToUpdate } },
-        { $set: { cancelled: true } }
+        { $set: { cancelled: true } },
       );
 
       cashflowCancelled = await Cashflow.aggregate([
@@ -2964,8 +3004,8 @@ Controllers.getLastNumOrder = async (req, res) => {
     const lastNumOrder = findEmployee.enableNewNumOrder
       ? findEmployee.newNumOrder
       : !lastSaleByEmployee || lastSaleByEmployee.order >= 100
-      ? 1
-      : lastSaleByEmployee.order + 1;
+        ? 1
+        : lastSaleByEmployee.order + 1;
 
     res.send({ results: lastNumOrder });
   } catch (error) {
@@ -3016,8 +3056,8 @@ const templateRecieve = async ({
         (item) =>
           `${alignRight(item.quantity.toString(), 10)} x ${alignRight(
             formatCurrency(item.price),
-            10
-          )} | ${alignRight(formatCurrency(item.quantity * item.price), 10)}`
+            10,
+          )} | ${alignRight(formatCurrency(item.quantity * item.price), 10)}`,
       )
       .join("\n");
   };
@@ -3028,10 +3068,10 @@ const templateRecieve = async ({
         (item) =>
           `  ${mappingPriceWithConcept[item.concept]}: ${alignRight(
             item.quantity.toString(),
-            20 - mappingPriceWithConcept[item.concept].length
+            20 - mappingPriceWithConcept[item.concept].length,
           )} x ${formatCurrency(item.price)} | ${formatCurrency(
-            item.quantity * item.price
-          )}`
+            item.quantity * item.price,
+          )}`,
       )
       .join("\n");
   };
@@ -3090,7 +3130,7 @@ www.cenitho.com\n`;
   Items:\n${pricesToString(pricesSelected)}
   Total de prendas: ${pricesSelected.reduce(
     (acc, current) => acc + current.quantity,
-    0
+    0,
   )}`;
 
   if (pricesWithconcepts.length) {
@@ -3113,16 +3153,16 @@ Total: ${alignRight(formatCurrency(totalPrices), 28)}`;
   Devoluciones:\n${pricesToString(devolutionPricesSelected)}
   Total de prendas: ${devolutionPricesSelected.reduce(
     (acc, current) => acc + current.quantity,
-    0
+    0,
   )}
 Total: ${alignRight(
         formatCurrency(
           devolutionPricesSelected.reduce(
             (acc, current) => current.price * current.quantity + acc,
-            0
-          )
+            0,
+          ),
         ),
-        29
+        29,
       )}`;
   }
 
@@ -3155,7 +3195,7 @@ Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 22)}
         percentageCash !== 0 ? "(" + percentageCash + "%)" : ""
       }:${alignRight(
         formatCurrency(totalCash),
-        percentageCash !== 0 ? 17 - String(percentageCash).length : 20
+        percentageCash !== 0 ? 17 - String(percentageCash).length : 20,
       )}`;
   }
   if (totalTransfer !== 0) {
@@ -3167,7 +3207,7 @@ Saldo a pagar: ${alignRight(formatCurrency(totalToPay), 22)}
       }: ${alignRight(
         formatCurrency(totalTransfer),
 
-        percentageTransfer !== 0 ? 11 - String(percentageTransfer).length : 14
+        percentageTransfer !== 0 ? 11 - String(percentageTransfer).length : 14,
       )}`;
   }
 
