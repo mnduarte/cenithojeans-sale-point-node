@@ -11,7 +11,7 @@ const Employee = new BaseModel("Employee");
 const Cashflow = new BaseModel("Cashflow");
 const Cost = new BaseModel("Cost");
 
-//const printer = require("@woovi/node-printer");
+const { printTicketAuto } = require("../services/printer.service");
 
 const now = new Date();
 const fifteenDaysAgo = new Date();
@@ -3292,27 +3292,13 @@ Controllers.print = async (req, res) => {
       cashierName,
     });
 
-    const formattedData = `${tpl}\n\n\n\n`;
-
-    //const rawCommands = "\x1B\x69";
-    const rawCommands = "\x1B";
-    const rawDataToSend = formattedData + rawCommands;
-
-    /*printer.printDirect({
-      data: rawDataToSend,
-      printer: "SAM4S GIANT-100", // Reemplaza con el nombre de tu impresora
-      type: "RAW",
-      success: function (jobID) {
-        console.log("sent to printer with ID: " + jobID);
-      },
-      error: function (err) {
-        console.log(err);
-      },
-    });*/
-
-    console.log(tpl);
-
-    res.send({ results: "Se imprimio!" });
+    try {
+      const result = await printTicketAuto(tpl);
+      res.send({ results: result.message });
+    } catch (printError) {
+      console.error("Print error:", printError);
+      res.status(500).json({ message: "Error en la impresión" });
+    }
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Hubo un error en la impresion" });
