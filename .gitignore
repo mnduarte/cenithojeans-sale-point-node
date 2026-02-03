@@ -7,6 +7,12 @@
 node_modules/
 dist/
 
+# Environment variables - NUNCA subir a git
+.env
+.env.local
+.env.production
+.env.*
+
 # Compiled Java class files
 *.class
 
@@ -47,7 +53,6 @@ Thumbs.db
 *.flv
 *.mov
 *.wmv
-
 
 # Snyk Security Extension - AI Rules (auto-generated)
 .github\instructions\snyk_rules.instructions.md

@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
 const MongoConfig = require("./mongo.config");
 
-const env = "stg";
+// Usa variable de entorno NODE_ENV, por defecto "stg"
+const env = process.env.NODE_ENV || "stg";
 const databases = [MongoConfig];
 
 databases.forEach((database) => {

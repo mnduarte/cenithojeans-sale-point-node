@@ -8,11 +8,12 @@ module.exports = {
     },
   },
   stg: {
-    dbname:
-      "cenithojeans:<password>@cluster-sales-point-cen.2gdhwkr.mongodb.net",
-    host: "?retryWrites=true&w=majority",
     build() {
-      return `mongodb+srv://cenithojeans:vNlQiXU07ijyhmfA@cluster-sales-point-cen.2gdhwkr.mongodb.net/?retryWrites=true&w=majority`;
+      // Usa variable de entorno si existe, sino usa el valor por defecto
+      return (
+        process.env.MONGO_URI ||
+        "mongodb+srv://cenithojeans:vNlQiXU07ijyhmfA@cluster-sales-point-cen.2gdhwkr.mongodb.net/?retryWrites=true&w=majority"
+      );
     },
   },
   test: {

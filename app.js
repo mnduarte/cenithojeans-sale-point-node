@@ -1,3 +1,4 @@
+require("dotenv").config();
 const packageInfo = require("./package.json");
 const express = require("express");
 const config = require("./config/app.config");
