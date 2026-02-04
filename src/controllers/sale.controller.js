@@ -3244,6 +3244,26 @@ de los 20 dias presentando este ticket
   return tpl;
 };
 
+// Función auxiliar para obtener el store correcto
+const getStoreForPrint = async (seller, userStore) => {
+  // Si el usuario tiene store específico (no es ALL), usar ese
+  if (userStore && userStore !== "ALL") {
+    return userStore;
+  }
+
+  // Si es ALL, buscar el store del empleado vendedor
+  if (seller) {
+    const employee = await Employee.findOne({ name: seller });
+    if (employee && employee.store) {
+      return employee.store;
+    }
+  }
+
+  // Default a BOGOTA si no se puede determinar
+  return "BOGOTA";
+};
+
+// Reemplazar Controllers.print con esto:
 Controllers.print = async (req, res) => {
   try {
     const {
@@ -3267,6 +3287,7 @@ Controllers.print = async (req, res) => {
       totalToPay,
       total,
       cashierName,
+      userStore, // Agregar en el frontend al llamar a printSale
     } = req.body;
 
     const tpl = await templateRecieve({
@@ -3292,16 +3313,85 @@ Controllers.print = async (req, res) => {
       cashierName,
     });
 
+    const PRINT_MODE = req.app.get("PRINT_MODE");
+
+    // ============================================
+    // MODO LOCAL - Impresión directa (sin cambios)
+    // ============================================
+    if (PRINT_MODE === "local") {
+      try {
+        const result = await printTicketAuto(tpl);
+        return res.send({ results: result.message });
+      } catch (printError) {
+        console.error("Print error:", printError);
+        return res.status(500).json({ message: "Error en la impresión" });
+      }
+    }
+
+    // ============================================
+    // MODO CLOUD - Enviar via Socket.io
+    // ============================================
+    const io = req.app.get("io");
+    const printServices = req.app.get("printServices");
+
+    if (!io) {
+      return res.status(500).json({ message: "Socket.io no configurado" });
+    }
+
+    // Determinar a qué sucursal enviar
+    const store = await getStoreForPrint(seller, userStore);
+
+    // Verificar si el servicio de esa sucursal está conectado
+    if (!printServices.has(store)) {
+      console.log(`❌ Print Service no conectado para: ${store}`);
+      return res.status(503).json({
+        message: `Servicio de impresión no disponible para ${store}`,
+        error: "PRINT_SERVICE_OFFLINE",
+      });
+    }
+
+    // Generar ID único para el job
+    const jobId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Crear promesa que espera la respuesta
+    const printPromise = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        io.off(`print_result_${jobId}`);
+        reject(new Error("Timeout esperando respuesta de impresión"));
+      }, 10000); // 10 segundos timeout
+
+      io.once(`print_result_${jobId}`, (result) => {
+        clearTimeout(timeout);
+        if (result.success) {
+          resolve(result);
+        } else {
+          reject(new Error(result.message || "Error de impresión"));
+        }
+      });
+    });
+
+    // Enviar trabajo de impresión al room de la sucursal
+    console.log(`📤 Enviando print job a ${store}: ${jobId}`);
+    io.to(store).emit("print_job", {
+      jobId,
+      ticketContent: tpl,
+      store,
+      seller,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Esperar respuesta
     try {
-      const result = await printTicketAuto(tpl);
-      res.send({ results: result.message });
+      const result = await printPromise;
+      console.log(`✅ Print job completado: ${jobId}`);
+      return res.send({ results: result.message || "Impreso correctamente" });
     } catch (printError) {
-      console.error("Print error:", printError);
-      res.status(500).json({ message: "Error en la impresión" });
+      console.error(`❌ Print job falló: ${jobId}`, printError.message);
+      return res.status(500).json({ message: printError.message });
     }
   } catch (error) {
     console.log(error);
-    res.status(500).json({ message: "Hubo un error en la impresion" });
+    res.status(500).json({ message: "Hubo un error en la impresión" });
   }
 };
 

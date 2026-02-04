@@ -22,7 +22,8 @@
     "mongo-sanitize": "^1.1.0",
     "mongoose": "^7.0.5",
     "mongoose-autopopulate": "^1.0.0",
-    "mongoose-plugin-autoinc": "^1.1.9"
+    "mongoose-plugin-autoinc": "^1.1.9",
+    "socket.io": "^4.7.2"
   },
   "optionalDependencies": {
     "@woovi/node-printer": "^1.0.1"
