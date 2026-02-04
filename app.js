@@ -20,7 +20,8 @@ require("./config/database.config");
 // ============================================
 
 const API_KEY = process.env.API_KEY || "cj_sk_2024_x7k9m2p4q5r6s8t9";
-const PRINT_SERVICE_TOKEN = process.env.PRINT_SERVICE_TOKEN || "cj_print_2024_s3cur3t0k3n";
+const PRINT_SERVICE_TOKEN =
+  process.env.PRINT_SERVICE_TOKEN || "cj_print_2024_s3cur3t0k3n";
 const PRINT_MODE = process.env.PRINT_MODE || "local"; // "local" o "cloud"
 
 // Dominios permitidos para CORS
@@ -28,6 +29,8 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "http://localhost:3000",
+  "http://localhost:8100",
+  "http://127.0.0.1:8100",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
@@ -36,7 +39,7 @@ const corsOptions = {
     if (!origin && process.env.NODE_ENV !== "production") {
       return callback(null, true);
     }
-    
+
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -57,16 +60,16 @@ const validateApiKey = (req, res, next) => {
   const apiKey = req.headers["x-api-key"];
 
   if (!apiKey) {
-    return res.status(401).json({ 
+    return res.status(401).json({
       error: "API Key no proporcionada",
-      message: "Se requiere el header X-API-Key" 
+      message: "Se requiere el header X-API-Key",
     });
   }
 
   if (apiKey !== API_KEY) {
-    return res.status(401).json({ 
+    return res.status(401).json({
       error: "API Key inválida",
-      message: "Las credenciales proporcionadas no son válidas" 
+      message: "Las credenciales proporcionadas no son válidas",
     });
   }
 
@@ -82,7 +85,7 @@ const printServices = new Map(); // Almacena conexiones de servicios de impresi�
 
 if (PRINT_MODE === "cloud") {
   const { Server } = require("socket.io");
-  
+
   io = new Server(server, {
     cors: {
       origin: "*", // Los print services pueden conectar desde cualquier IP local
@@ -111,11 +114,11 @@ if (PRINT_MODE === "cloud") {
 
   io.on("connection", (socket) => {
     const store = socket.store;
-    
+
     // Registrar servicio de impresión
     printServices.set(store, socket.id);
     socket.join(store);
-    
+
     console.log(`🖨️ Print Service conectado: ${store} (${socket.id})`);
 
     // Manejar resultado de impresión
@@ -162,8 +165,8 @@ app.get("/health", (req, res) => {
     });
   }
 
-  res.status(200).json({ 
-    status: "ok", 
+  res.status(200).json({
+    status: "ok",
     timestamp: new Date().toISOString(),
     service: packageInfo.name,
     version: packageInfo.version,
@@ -173,10 +176,10 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.status(200).json({ 
+  res.status(200).json({
     message: "Sales Point API",
     version: packageInfo.version,
-    health: "/health"
+    health: "/health",
   });
 });
 
@@ -202,7 +205,9 @@ if (config.local) {
     console.log(`🔒 CORS habilitado para: ${allowedOrigins.join(", ")}`);
     console.log(`🔑 API Key configurada: ${API_KEY.substring(0, 10)}...`);
     if (PRINT_MODE === "cloud") {
-      console.log(`🔑 Print Service Token: ${PRINT_SERVICE_TOKEN.substring(0, 15)}...`);
+      console.log(
+        `🔑 Print Service Token: ${PRINT_SERVICE_TOKEN.substring(0, 15)}...`,
+      );
     }
   });
 }
