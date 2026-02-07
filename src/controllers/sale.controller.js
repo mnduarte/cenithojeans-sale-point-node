@@ -10,6 +10,8 @@ const Sale = new BaseModel("Sale");
 const Employee = new BaseModel("Employee");
 const Cashflow = new BaseModel("Cashflow");
 const Cost = new BaseModel("Cost");
+const Printer = new BaseModel("Printer");
+const Cashier = new BaseModel("Cashier");
 
 const { printTicketAuto } = require("../services/printer.service");
 
@@ -3052,13 +3054,14 @@ const templateRecieve = async ({
 
   const pricesToString = (prices) => {
     return prices
-      .map(
-        (item) =>
-          `${alignRight(item.quantity.toString(), 10)} x ${alignRight(
-            formatCurrency(item.price),
-            10,
-          )} | ${alignRight(formatCurrency(item.quantity * item.price), 10)}`,
-      )
+      .map((item) => {
+        // J = jeans (o sin tipo), R = remera
+        const typeLabel = item.type === "remera" ? "R" : "J";
+        return `  ${typeLabel}  ${alignRight(item.quantity.toString(), 5)} x ${alignRight(
+          formatCurrency(item.price),
+          10,
+        )} | ${alignRight(formatCurrency(item.quantity * item.price), 10)}`;
+      })
       .join("\n");
   };
 
@@ -3263,7 +3266,74 @@ const getStoreForPrint = async (seller, userStore) => {
   return "BOGOTA";
 };
 
-// Reemplazar Controllers.print con esto:
+// ============================================
+// FUNCIÓN AUXILIAR: Obtener nombre de impresora
+// ============================================
+
+const getPrinterNameForCashier = async (cashierId, userStore) => {
+  try {
+    // 1. Si hay cashierId, buscar el cajero y su impresora
+    if (cashierId) {
+      const CashierSchema = require("../schemas/cashier.schema");
+      const PrinterSchema = require("../schemas/printer.schema");
+
+      const cashier = await CashierSchema.findById(cashierId);
+
+      if (cashier && cashier.printerId) {
+        const printer = await PrinterSchema.findById(cashier.printerId);
+        if (printer && printer.networkName) {
+          console.log(
+            `🖨️ Impresora del cajero ${cashier.name}: ${printer.networkName}`,
+          );
+          return printer.networkName;
+        }
+      }
+
+      // Cajero sin impresora asignada, usar su sucursal
+      if (cashier) {
+        userStore = cashier.store;
+      }
+    }
+
+    // 2. Buscar impresora por defecto de la sucursal
+    if (userStore && userStore !== "ALL") {
+      const PrinterSchema = require("../schemas/printer.schema");
+      const defaultPrinter = await PrinterSchema.findOne({
+        store: userStore,
+        isDefault: true,
+        active: true,
+      });
+
+      if (defaultPrinter) {
+        console.log(
+          `🖨️ Impresora por defecto de ${userStore}: ${defaultPrinter.networkName}`,
+        );
+        return defaultPrinter.networkName;
+      }
+
+      // Si no hay por defecto, usar la primera activa de la sucursal
+      const anyPrinter = await PrinterSchema.findOne({
+        store: userStore,
+        active: true,
+      });
+
+      if (anyPrinter) {
+        console.log(
+          `🖨️ Primera impresora de ${userStore}: ${anyPrinter.networkName}`,
+        );
+        return anyPrinter.networkName;
+      }
+    }
+
+    // 3. Fallback: null (el print service usará PRINTER_NAME del .env)
+    console.log(`🖨️ Sin impresora específica, usando fallback del .env`);
+    return null;
+  } catch (error) {
+    console.error("Error obteniendo impresora:", error);
+    return null;
+  }
+};
+
 Controllers.print = async (req, res) => {
   try {
     const {
@@ -3287,7 +3357,8 @@ Controllers.print = async (req, res) => {
       totalToPay,
       total,
       cashierName,
-      userStore, // Agregar en el frontend al llamar a printSale
+      userStore,
+      cashierId,
     } = req.body;
 
     const tpl = await templateRecieve({
@@ -3350,34 +3421,53 @@ Controllers.print = async (req, res) => {
       });
     }
 
+    // Obtener nombre de impresora
+    const printerName = await getPrinterNameForCashier(cashierId, store);
+
     // Generar ID único para el job
     const jobId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Crear promesa que espera la respuesta
     const printPromise = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        io.off(`print_result_${jobId}`);
-        reject(new Error("Timeout esperando respuesta de impresión"));
-      }, 10000); // 10 segundos timeout
+      let isResolved = false;
 
-      io.once(`print_result_${jobId}`, (result) => {
+      const cleanup = () => {
+        isResolved = true;
         clearTimeout(timeout);
+        io.removeListener(`print_result_${jobId}`, resultHandler);
+      };
+
+      const resultHandler = (result) => {
+        if (isResolved) return;
+        cleanup();
+
         if (result.success) {
           resolve(result);
         } else {
           reject(new Error(result.message || "Error de impresión"));
         }
-      });
+      };
+
+      const timeout = setTimeout(() => {
+        if (isResolved) return;
+        cleanup();
+        reject(new Error("Timeout esperando respuesta de impresión"));
+      }, 10000);
+
+      io.on(`print_result_${jobId}`, resultHandler);
     });
 
     // Enviar trabajo de impresión al room de la sucursal
-    console.log(`📤 Enviando print job a ${store}: ${jobId}`);
+    console.log(
+      `📤 Enviando print job a ${store}: ${jobId} (impresora: ${printerName || "default"})`,
+    );
     io.to(store).emit("print_job", {
       jobId,
       ticketContent: tpl,
       store,
       seller,
       timestamp: new Date().toISOString(),
+      printerName,
     });
 
     // Esperar respuesta

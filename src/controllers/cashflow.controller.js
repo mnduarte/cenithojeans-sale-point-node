@@ -19,16 +19,14 @@ Controllers.create = async (req, res) => {
       cashierName,
     } = req.body;
 
-    const selectedDate = new Date(date);
-    const now = new Date();
-    selectedDate.setHours(
-      now.getHours(),
-      now.getMinutes(),
-      now.getSeconds(),
-      now.getMilliseconds()
-    );
+    // Parsear la fecha correctamente (evitar problema de timezone)
+    const [year, month, day] = date.split("-").map(Number);
+    const selectedDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 
-    const newCashFlow = await Cashflow.create({
+    // Usar el schema directamente para poder forzar createdAt
+    const CashflowSchema = require("../schemas/cashflow.schema");
+
+    const newCashFlow = new CashflowSchema({
       type,
       amount,
       employee,
@@ -36,10 +34,14 @@ Controllers.create = async (req, res) => {
       description,
       items,
       typePayment,
-      createdAt: selectedDate,
       cashierId,
       cashierName,
     });
+
+    // Forzar el createdAt DESPUÉS de instanciar
+    newCashFlow.createdAt = selectedDate;
+
+    await newCashFlow.save();
 
     res.send({
       results: newCashFlow,
@@ -55,7 +57,7 @@ Controllers.getCashflowByDay = async (req, res) => {
     const { date, store } = req.query;
 
     const addOneDayDate = new Date(
-      new Date(date).setDate(new Date(date).getDate() + 1)
+      new Date(date).setDate(new Date(date).getDate() + 1),
     );
 
     const query = {
@@ -120,7 +122,7 @@ Controllers.getOutgoingsByDay = async (req, res) => {
     const { date, store } = req.query;
 
     const addOneDayDate = new Date(
-      new Date(date).setDate(new Date(date).getDate() + 1)
+      new Date(date).setDate(new Date(date).getDate() + 1),
     );
 
     const query = {
@@ -163,7 +165,7 @@ Controllers.update = async (req, res) => {
     const { id, dataIndex, value } = req.body;
     const updatedPrice = await Cashflow.findByIdAndUpdate(
       { _id: id },
-      { [dataIndex]: value }
+      { [dataIndex]: value },
     );
 
     const transformedResults = {
@@ -173,7 +175,7 @@ Controllers.update = async (req, res) => {
 
     if (updatedPrice.checkoutDate) {
       transformedResults.checkoutDate = formatCheckoutDate(
-        updatedPrice.checkoutDate
+        updatedPrice.checkoutDate,
       );
     }
 
@@ -195,7 +197,7 @@ Controllers.remove = async (req, res) => {
 
     await Cashflow.updateMany(
       { _id: { $in: chasflowsIdsToUpdate } },
-      { $set: { cancelled: true } }
+      { $set: { cancelled: true } },
     );
 
     cashflowCancelled = await Cashflow.aggregate([

@@ -1,12 +1,15 @@
 // @Vendors
 const mongoose = require("mongoose");
-const { autoIncrement } = require("mongoose-plugin-autoinc");
 const Autopopulate = require("mongoose-autopopulate");
 const _ = require("lodash");
 
-const CashierSchema = mongoose.Schema(
+const PrinterSchema = mongoose.Schema(
   {
     name: {
+      type: String,
+      required: true,
+    },
+    networkName: {
       type: String,
       required: true,
     },
@@ -14,29 +17,14 @@ const CashierSchema = mongoose.Schema(
       type: String,
       required: true,
     },
-    color: {
-      type: String,
-      required: true,
-    },
-    position: {
-      type: Number,
-      default: 0,
-    },
     active: {
       type: Boolean,
       default: true,
     },
-    isAdmin: {
+    isDefault: {
       type: Boolean,
       default: false,
     },
-    // ========== NUEVO CAMPO ==========
-    printerId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Printer",
-      default: null,
-    },
-    // =================================
   },
   {
     timestamps: {
@@ -49,15 +37,12 @@ const CashierSchema = mongoose.Schema(
 /**
  * Instance method to expose to the API only the related fields.
  */
-CashierSchema.methods.toJSON = function () {
+PrinterSchema.methods.toJSON = function () {
   const obj = this.toObject();
   return _.omit(obj, ["__v"]);
 };
 
-CashierSchema.plugin(autoIncrement, {
-  model: "Cashier",
-  startAt: 1,
-});
-CashierSchema.plugin(Autopopulate);
+// NO usar autoIncrement para Printer - usamos ObjectId nativo
+PrinterSchema.plugin(Autopopulate);
 
-module.exports = mongoose.model("Cashier", CashierSchema);
+module.exports = mongoose.model("Printer", PrinterSchema);

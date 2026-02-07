@@ -11,6 +11,22 @@ const getAllCashiers = async (store = "ALL") => {
     {
       $match: { ...filter, active: { $ne: false } },
     },
+    // ========== LOOKUP PARA PRINTER ==========
+    {
+      $lookup: {
+        from: "printers",
+        localField: "printerId",
+        foreignField: "_id",
+        as: "printer",
+      },
+    },
+    {
+      $unwind: {
+        path: "$printer",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    // =========================================
     {
       $project: {
         id: "$_id",
@@ -20,6 +36,11 @@ const getAllCashiers = async (store = "ALL") => {
         position: 1,
         active: 1,
         isAdmin: 1,
+        // ========== NUEVOS CAMPOS ==========
+        printerId: 1,
+        printerName: "$printer.name",
+        printerNetworkName: "$printer.networkName",
+        // ===================================
         _id: 0,
       },
     },
@@ -60,7 +81,7 @@ Controllers.getAll = async (req, res) => {
 
 Controllers.create = async (req, res) => {
   try {
-    const { name, store, color, position, isAdmin } = req.body;
+    const { name, store, color, position, isAdmin, printerId } = req.body;
 
     await Cashier.create({
       name,
@@ -69,6 +90,7 @@ Controllers.create = async (req, res) => {
       position,
       active: true,
       isAdmin: isAdmin || false,
+      printerId: printerId || null,
     });
 
     const cashiers = await getAllCashiers("ALL");
@@ -84,7 +106,7 @@ Controllers.create = async (req, res) => {
 
 Controllers.update = async (req, res) => {
   try {
-    const { id, name, store, color, position, active, isAdmin } = req.body;
+    const { id, name, store, color, position, active, isAdmin, printerId } = req.body;
 
     // Validar que id existe
     if (!id) {
@@ -106,7 +128,15 @@ Controllers.update = async (req, res) => {
     // Actualizar el cajero
     const updatedCashier = await CashierSchema.findByIdAndUpdate(
       id,
-      { name, store, color, position, active, isAdmin },
+      { 
+        name, 
+        store, 
+        color, 
+        position, 
+        active, 
+        isAdmin,
+        printerId: printerId || null,
+      },
       { new: true }
     );
 

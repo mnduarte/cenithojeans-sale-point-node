@@ -14,6 +14,7 @@ const schemas = {
   Cost: require("../schemas/cost.schema"),
   Account: require("../schemas/account.schema"),
   Cashier: require("../schemas/cashier.schema"),
+  Printer: require("../schemas/printer.schema"),
 };
 
 class BaseModel {
@@ -80,7 +81,7 @@ class BaseModel {
    */
   findOne(
     query = {},
-    { orderBy = "-createdAt", projection, mustSanitize = true } = {}
+    { orderBy = "-createdAt", projection, mustSanitize = true } = {},
   ) {
     return this.Schema.findOne(query, projection).sort(orderBy);
   }
@@ -128,7 +129,7 @@ class BaseModel {
    */
   findAll(
     query = {},
-    { limit = 10, offset = 0, orderBy = "-createdAt", pagination = true } = {}
+    { limit = 10, offset = 0, orderBy = "-createdAt", pagination = true } = {},
   ) {
     const cleanQuery = sanitize(query);
 
@@ -147,7 +148,7 @@ class BaseModel {
    */
   findAllNotSecure(
     query = {},
-    { limit = 10, offset = 0, orderBy = "-createdAt", pagination = true } = {}
+    { limit = 10, offset = 0, orderBy = "-createdAt", pagination = true } = {},
   ) {
     if (pagination)
       return this.Schema.find(query)
@@ -164,7 +165,7 @@ class BaseModel {
   findAllAndPopulate(
     query = {},
     populate,
-    { limit = 10, offset = 0, orderBy = "-createdAt" } = {}
+    { limit = 10, offset = 0, orderBy = "-createdAt" } = {},
   ) {
     const cleanQuery = sanitize(query);
     return this.Schema.find(cleanQuery)

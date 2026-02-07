@@ -12,6 +12,7 @@ const adminRoutes = require("./admin.route");
 const costRoutes = require("./cost.route");
 const accounttransferRoutes = require("./accounttransfer.route");
 const cashierRoutes = require("./cashier.route");
+const printerRoutes = require("./printer.route");
 
 /*
 // Función para agregar retraso
@@ -36,5 +37,6 @@ router.use("/admin", adminRoutes);
 router.use("/cost", costRoutes);
 router.use("/accounttransfer", accounttransferRoutes);
 router.use("/cashier", cashierRoutes);
+router.use("/printer", printerRoutes);
 
 module.exports = router;
