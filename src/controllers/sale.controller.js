@@ -12,6 +12,7 @@ const Cashflow = new BaseModel("Cashflow");
 const Cost = new BaseModel("Cost");
 const Printer = new BaseModel("Printer");
 const Cashier = new BaseModel("Cashier");
+const { getAllAcountsForTransfer } = require("./accounttransfer.controller");
 
 const { printTicketAuto } = require("../services/printer.service");
 
@@ -468,6 +469,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           total: 1,
           cancelled: 1,
           description: 1,
+          accountForTransfer: 1,
           cashierId: 1,
           cashierName: 1,
           // Campos de desglose jeans/remeras
@@ -533,6 +535,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           total: 1,
           cancelled: 1,
           description: 1,
+          accountForTransfer: 1,
           cashierId: 1,
           cashierName: 1,
           subTotalCashJeans: 1,
@@ -581,6 +584,7 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           total: 1,
           cancelled: 1,
           description: 1,
+          accountForTransfer: 1,
           isWithPrepaid: 1,
           cashierId: 1,
           cashierName: 1,
@@ -600,12 +604,17 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       },
     ]);
 
+    const accounts = await getAllAcountsForTransfer();
+
     const getSalesByEmployees = {};
 
     sales
       .map((sale) =>
         normalizeSaleData({
           ...sale,
+          accountForTransferAcronym:
+            accounts.find((acc) => acc.name === sale.accountForTransfer)
+              ?.acronym || "MPC",
           cash:
             !Boolean(sale.cash) && !Boolean(sale.transfer)
               ? sale.total
@@ -636,6 +645,9 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       .map((order) =>
         normalizeSaleData({
           ...order,
+          accountForTransferAcronym:
+            accounts.find((acc) => acc.name === order.accountForTransfer)
+              ?.acronym || "MPC",
         }),
       )
       .forEach((order) => {
@@ -648,6 +660,9 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
       .map((order) =>
         normalizeSaleData({
           ...order,
+          accountForTransferAcronym:
+            accounts.find((acc) => acc.name === order.accountForTransfer)
+              ?.acronym || "MPC",
         }),
       )
       .forEach((order) => {

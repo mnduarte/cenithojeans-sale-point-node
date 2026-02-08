@@ -9,6 +9,9 @@ const AccountTransferSchema = mongoose.Schema(
     name: {
       type: String,
     },
+    acronym: {
+      type: String,
+    },
     store: {
       type: String,
     },
@@ -24,7 +27,7 @@ const AccountTransferSchema = mongoose.Schema(
       createdAt: "createdAt",
       updatedAt: "updatedAt",
     },
-  }
+  },
 );
 
 /**
