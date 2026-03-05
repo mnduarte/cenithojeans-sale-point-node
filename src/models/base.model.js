@@ -1,5 +1,7 @@
 // @Vendors
 const sanitize = require("mongo-sanitize");
+const mongoose = require("mongoose");
+const { connectionStore } = require("../../config/database.config");
 // @Schemas
 const schemas = {
   User: require("../schemas/user.schema"),
@@ -19,7 +21,27 @@ const schemas = {
 
 class BaseModel {
   constructor(schemaName) {
+    this.schemaName = schemaName;
     this.Schema = schemas[schemaName];
+  }
+
+  /**
+   * Returns the Mongoose model for the current request's DB connection.
+   * If a local connection is active (via x-client-env header), uses that.
+   * Falls back to the default connection model otherwise.
+   */
+  _getModel() {
+    const conn = connectionStore.getStore();
+    if (conn) {
+      try {
+        return conn.model(this.schemaName);
+      } catch (_) {
+        // Model not yet registered on this connection — register it now
+        const schema = mongoose.models[this.schemaName]?.schema;
+        return conn.model(this.schemaName, schema);
+      }
+    }
+    return this.Schema;
   }
 
   /**
@@ -30,7 +52,7 @@ class BaseModel {
    * @param {Function} next
    */
   findByIdAndUpdate(id, data) {
-    return this.Schema.findByIdAndUpdate(id, data, { new: true });
+    return this._getModel().findByIdAndUpdate(id, data, { new: true });
   }
 
   /**
@@ -50,7 +72,8 @@ class BaseModel {
 
     const cleanedData = sanitize(data);
 
-    const doc = new this.Schema(cleanedData);
+    const Model = this._getModel();
+    const doc = new Model(cleanedData);
 
     await doc.save();
     return doc;
@@ -65,7 +88,7 @@ class BaseModel {
   async insertMany(data) {
     const cleanedData = sanitize(data);
     try {
-      const newData = await this.Schema.insertMany(cleanedData);
+      const newData = await this._getModel().insertMany(cleanedData);
       console.log("Documents inserted correctly");
       return newData;
     } catch (error) {
@@ -83,7 +106,7 @@ class BaseModel {
     query = {},
     { orderBy = "-createdAt", projection, mustSanitize = true } = {},
   ) {
-    return this.Schema.findOne(query, projection).sort(orderBy);
+    return this._getModel().findOne(query, projection).sort(orderBy);
   }
 
   /**
@@ -92,11 +115,11 @@ class BaseModel {
    * @param {Object} query
    */
   findOneNotSecure(query) {
-    return this.Schema.findOne(query);
+    return this._getModel().findOne(query);
   }
 
   remove(query) {
-    return this.Schema.deleteOne(query);
+    return this._getModel().deleteOne(query);
   }
 
   /**
@@ -105,14 +128,14 @@ class BaseModel {
    * @param {Object} query
    */
   removeMany(query) {
-    return this.Schema.deleteMany(query);
+    return this._getModel().deleteMany(query);
   }
 
   /**
    * Remove all documents from the collection.
    */
   removeAll() {
-    return this.Schema.deleteMany({});
+    return this._getModel().deleteMany({});
   }
 
   /**
@@ -120,7 +143,7 @@ class BaseModel {
    *
    */
   async find(query = {}, orderBy = {}, limit = {}, projection = {}) {
-    return this.Schema.find(query, projection).sort(orderBy).limit(limit);
+    return this._getModel().find(query, projection).sort(orderBy).limit(limit);
   }
 
   /**
@@ -134,12 +157,12 @@ class BaseModel {
     const cleanQuery = sanitize(query);
 
     if (pagination)
-      return this.Schema.find(cleanQuery)
+      return this._getModel().find(cleanQuery)
         .limit(limit)
         .skip(offset * limit)
         .sort(orderBy);
 
-    return this.Schema.find(cleanQuery).sort(orderBy);
+    return this._getModel().find(cleanQuery).sort(orderBy);
   }
 
   /**
@@ -151,11 +174,11 @@ class BaseModel {
     { limit = 10, offset = 0, orderBy = "-createdAt", pagination = true } = {},
   ) {
     if (pagination)
-      return this.Schema.find(query)
+      return this._getModel().find(query)
         .limit(limit)
         .skip(offset * limit)
         .sort(orderBy);
-    return this.Schema.find(query).sort(orderBy);
+    return this._getModel().find(query).sort(orderBy);
   }
 
   /**
@@ -168,7 +191,7 @@ class BaseModel {
     { limit = 10, offset = 0, orderBy = "-createdAt" } = {},
   ) {
     const cleanQuery = sanitize(query);
-    return this.Schema.find(cleanQuery)
+    return this._getModel().find(cleanQuery)
       .populate(populate)
       .limit(limit)
       .skip(offset * limit)
@@ -177,7 +200,7 @@ class BaseModel {
 
   findOneAndUpdate(filter = {}, update = {}) {
     const cleanFilter = sanitize(filter);
-    return this.Schema.findOneAndUpdate(cleanFilter, update, { new: true });
+    return this._getModel().findOneAndUpdate(cleanFilter, update, { new: true });
   }
 
   /**
@@ -187,14 +210,14 @@ class BaseModel {
    */
   count(query = {}) {
     const cleanQuery = sanitize(query);
-    return this.Schema.count(cleanQuery);
+    return this._getModel().count(cleanQuery);
   }
 
   /**
    * Retrieve all aggregate data from this Schema
    */
   aggregate(list) {
-    return this.Schema.aggregate(list);
+    return this._getModel().aggregate(list);
   }
 
   /**
@@ -203,7 +226,7 @@ class BaseModel {
    * @param {Function} next
    */
   countNotSecure(query = {}) {
-    return this.Schema.count(query);
+    return this._getModel().count(query);
   }
 
   /**
@@ -213,7 +236,7 @@ class BaseModel {
    * @param {Function} query
    */
   updateMany(query = {}, update = {}) {
-    return this.Schema.updateMany(query, update);
+    return this._getModel().updateMany(query, update);
   }
 }
 

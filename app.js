@@ -49,7 +49,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "X-API-Key", "Authorization"],
+  allowedHeaders: ["Content-Type", "X-API-Key", "Authorization", "x-client-env"],
 };
 
 const validateApiKey = (req, res, next) => {
@@ -152,6 +152,7 @@ app.use(express.json());
 app.use(cors(corsOptions));
 app.use(boom());
 app.use(validateApiKey);
+app.use(require("./src/middleware/clientEnv.middleware"));
 
 // ============================================
 // HEALTH CHECK
