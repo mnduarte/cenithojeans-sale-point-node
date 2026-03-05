@@ -35,9 +35,9 @@ const calculateTotalPercentage = (percentageToDisccountOrAdd) => {
 
 function formatCheckoutDate(checkoutDate) {
   const date = new Date(checkoutDate);
-  const day = (date.getDate() + 1).toString().padStart(2, "0"); // Agrega cero adelante si es menor a 10
-  const month = (date.getMonth() + 1).toString().padStart(2, "0"); // Agrega cero adelante si es menor a 10
-  const formattedDate = `${day}/${month}/${date.getFullYear()}`;
+  const day = date.getUTCDate().toString().padStart(2, "0");
+  const month = (date.getUTCMonth() + 1).toString().padStart(2, "0");
+  const formattedDate = `${day}/${month}/${date.getUTCFullYear()}`;
   return formattedDate;
 }
 

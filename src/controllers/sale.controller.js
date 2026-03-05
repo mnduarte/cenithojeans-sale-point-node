@@ -20,6 +20,22 @@ const now = new Date();
 const fifteenDaysAgo = new Date();
 fifteenDaysAgo.setDate(now.getDate() - 15);
 
+// ==================== SINCRONIZACIÓN DE TOTALES DE ITEMS ====================
+const syncItemCounts = (sale, dataIndex, value) => {
+  if (dataIndex === "itemsJeans") {
+    sale.items = value + (sale.itemsRemeras || 0);
+  }
+  if (dataIndex === "itemsRemeras") {
+    sale.items = (sale.itemsJeans || 0) + value;
+  }
+  if (dataIndex === "itemsDevolutionJeans") {
+    sale.devolutionItems = value + (sale.itemsDevolutionRemeras || 0);
+  }
+  if (dataIndex === "itemsDevolutionRemeras") {
+    sale.devolutionItems = (sale.itemsDevolutionJeans || 0) + value;
+  }
+};
+
 // ==================== FUNCIÓN DE NORMALIZACIÓN PARA DATOS ANTIGUOS ====================
 const normalizeSaleData = (sale) => {
   const normalized = { ...sale };
@@ -232,6 +248,8 @@ Controllers.getOrders = async (req, res) => {
           transfer: 1,
           cash: 1,
           items: 1,
+          itemsJeans: 1,
+          itemsRemeras: 1,
           username: 1,
           total: 1,
           cancelled: 1,
@@ -352,6 +370,8 @@ Controllers.getOrdersCheckoutDate = async (req, res) => {
           transfer: 1,
           cash: 1,
           items: 1,
+          itemsJeans: 1,
+          itemsRemeras: 1,
           username: 1,
           total: 1,
           cancelled: 1,
@@ -538,6 +558,8 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           accountForTransfer: 1,
           cashierId: 1,
           cashierName: 1,
+          checkoutCashierId: 1,
+          checkoutCashierName: 1,
           subTotalCashJeans: 1,
           subTotalCashRemeras: 1,
           subTotalTransferJeans: 1,
@@ -663,6 +685,9 @@ Controllers.getSalesCashByEmployees = async (req, res) => {
           accountForTransferAcronym:
             accounts.find((acc) => acc.name === order.accountForTransfer)
               ?.acronym || "MPC",
+          // Usar el cajero que marcó la fecha de salida como cajero visible en Venta Local
+          cashierId: order.checkoutCashierId || order.cashierId,
+          cashierName: order.checkoutCashierName || order.cashierName,
         }),
       )
       .forEach((order) => {
@@ -2638,6 +2663,9 @@ Controllers.updateOrder = async (req, res) => {
       saleToUpdate.lastEditCashierName = cashierName;
     }
 
+    // Sincronizar totales de items (items, devolutionItems)
+    syncItemCounts(saleToUpdate, dataIndex, value);
+
     if (dataIndex === "cash") {
       saleToUpdate.total = saleToUpdate.transfer + value;
     }
@@ -2779,15 +2807,8 @@ Controllers.updateSaleByEmployee = async (req, res) => {
       saleToUpdate.subTotalTransferRemeras = 0;
     }
 
-    // Si actualiza itemsJeans, recalcular items total
-    if (dataIndex === "itemsJeans") {
-      saleToUpdate.items = value + (saleToUpdate.itemsRemeras || 0);
-    }
-
-    // Si actualiza itemsRemeras, recalcular items total
-    if (dataIndex === "itemsRemeras") {
-      saleToUpdate.items = (saleToUpdate.itemsJeans || 0) + value;
-    }
+    // Sincronizar totales de items (items, devolutionItems)
+    syncItemCounts(saleToUpdate, dataIndex, value);
 
     // Si actualiza items directamente (modo legacy), asignar todo a jeans
     if (dataIndex === "items") {
