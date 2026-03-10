@@ -14,6 +14,7 @@ router.get(
 );
 
 router.get("/sales-with-devolutions", Controllers.getSalesWithDevolutions);
+router.get("/vendor-daily-report", Controllers.getVendorDailyReport);
 
 router.put("/update-order", Controllers.updateOrder);
 router.put("/update-sale-by-employee", Controllers.updateSaleByEmployee);

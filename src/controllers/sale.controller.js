@@ -3521,6 +3521,133 @@ Controllers.print = async (req, res) => {
   }
 };
 
+Controllers.getVendorDailyReport = async (req, res) => {
+  try {
+    const { startDate, endDate, store, employee } = req.query;
+
+    const fromDate = new Date(startDate);
+    const toDate = new Date(endDate);
+    toDate.setDate(toDate.getDate() + 1);
+
+    const match = {
+      createdAt: { $gte: fromDate, $lt: toDate },
+      cancelled: { $ne: true },
+      typeSale: "local",
+    };
+
+    if (store && store !== "ALL") match.store = store;
+    if (employee && employee !== "ALL") match.employee = employee;
+
+    const salesRaw = await Sale.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: {
+            employee: "$employee",
+            date: { $dateToString: { format: "%d/%m", date: "$createdAt" } },
+            dateSort: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          },
+          jeans: { $sum: { $ifNull: ["$itemsJeans", 0] } },
+          remeras: { $sum: { $ifNull: ["$itemsRemeras", 0] } },
+          devJeans: { $sum: { $ifNull: ["$itemsDevolutionJeans", 0] } },
+          devRemeras: { $sum: { $ifNull: ["$itemsDevolutionRemeras", 0] } },
+        },
+      },
+      { $sort: { "_id.dateSort": 1 } },
+    ]);
+
+    // Build sorted dates list
+    const dateMap = new Map();
+    for (const s of salesRaw) {
+      if (!dateMap.has(s._id.dateSort)) dateMap.set(s._id.dateSort, s._id.date);
+    }
+    const dates = Array.from(dateMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, display]) => display);
+
+    // Get all employees ordered by position
+    const empFilter = store && store !== "ALL" ? { store } : {};
+    const allEmployees = await Employee.aggregate([
+      { $match: empFilter },
+      { $project: { name: 1, store: 1, position: 1, _id: 0 } },
+      { $sort: { position: 1 } },
+    ]);
+
+    // Build empDataMap
+    const empDataMap = new Map();
+    for (const s of salesRaw) {
+      const name = s._id.employee;
+      if (!empDataMap.has(name)) empDataMap.set(name, { days: {} });
+      empDataMap.get(name).days[s._id.date] = {
+        jeans: s.jeans,
+        remeras: s.remeras,
+        devJeans: s.devJeans,
+        devRemeras: s.devRemeras,
+      };
+    }
+
+    const employees = [];
+    const processed = new Set();
+
+    for (const emp of allEmployees) {
+      if (empDataMap.has(emp.name)) {
+        processed.add(emp.name);
+        const { days } = empDataMap.get(emp.name);
+        let tj = 0, tr = 0, tdj = 0, tdr = 0;
+        for (const d of Object.values(days)) {
+          tj += d.jeans; tr += d.remeras;
+          tdj += d.devJeans; tdr += d.devRemeras;
+        }
+        employees.push({
+          name: emp.name,
+          store: emp.store,
+          days,
+          subtotals: { jeans: tj, remeras: tr, devJeans: tdj, devRemeras: tdr },
+        });
+      }
+    }
+
+    // Include employees in sales but not in employee list
+    for (const [name, data] of empDataMap.entries()) {
+      if (!processed.has(name)) {
+        let tj = 0, tr = 0, tdj = 0, tdr = 0;
+        for (const d of Object.values(data.days)) {
+          tj += d.jeans; tr += d.remeras;
+          tdj += d.devJeans; tdr += d.devRemeras;
+        }
+        employees.push({
+          name,
+          store: "-",
+          days: data.days,
+          subtotals: { jeans: tj, remeras: tr, devJeans: tdj, devRemeras: tdr },
+        });
+      }
+    }
+
+    // Daily totals & grand totals
+    const dailyTotals = {};
+    const grandTotals = { jeans: 0, remeras: 0, devJeans: 0, devRemeras: 0 };
+    for (const emp of employees) {
+      grandTotals.jeans += emp.subtotals.jeans;
+      grandTotals.remeras += emp.subtotals.remeras;
+      grandTotals.devJeans += emp.subtotals.devJeans;
+      grandTotals.devRemeras += emp.subtotals.devRemeras;
+      for (const [date, day] of Object.entries(emp.days)) {
+        if (!dailyTotals[date]) dailyTotals[date] = { jeans: 0, remeras: 0, devJeans: 0, devRemeras: 0 };
+        dailyTotals[date].jeans += day.jeans;
+        dailyTotals[date].remeras += day.remeras;
+        dailyTotals[date].devJeans += day.devJeans;
+        dailyTotals[date].devRemeras += day.devRemeras;
+      }
+    }
+
+    res.json({ dates, employees, dailyTotals, grandTotals });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error al generar listado vendedor" });
+  }
+};
+
 module.exports = {
   Controllers,
 };
