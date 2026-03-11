@@ -32,6 +32,7 @@ const allowedOrigins = [
   "http://localhost:8100",
   "http://127.0.0.1:8100",
   process.env.FRONTEND_URL,
+  process.env.N8N_URL,
 ].filter(Boolean);
 
 const corsOptions = {
