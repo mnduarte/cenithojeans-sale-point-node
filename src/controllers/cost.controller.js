@@ -156,6 +156,36 @@ Controllers.getCosts = async (req, res) => {
           typeShipmentCashierName: 1,
         },
       },
+      {
+        $lookup: {
+          from: "sales",
+          let: { numOrder: "$numOrder" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $ne: ["$$numOrder", null] },
+                    { $ne: ["$$numOrder", ""] },
+                    { $eq: [{ $toString: "$order" }, "$$numOrder"] },
+                  ],
+                },
+              },
+            },
+            { $limit: 1 },
+            { $project: { accountForTransfer: 1, _id: 0 } },
+          ],
+          as: "_sale",
+        },
+      },
+      {
+        $addFields: {
+          accountForTransfer: {
+            $arrayElemAt: ["$_sale.accountForTransfer", 0],
+          },
+        },
+      },
+      { $project: { _sale: 0 } },
     ]);
 
     const updatedCostsForItems = adjustItemsForCosts(costs);
