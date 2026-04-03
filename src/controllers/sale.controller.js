@@ -168,6 +168,17 @@ Controllers.getSales = async (req, res) => {
           username: 1,
           cancelled: 1,
           total: 1,
+          cash: 1,
+          transfer: 1,
+          itemsJeans: 1,
+          itemsRemeras: 1,
+          cashierName: 1,
+          checkoutDate: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$checkoutDate",
+            },
+          },
           date: {
             $dateToString: {
               format: "%d/%m/%Y",
@@ -784,6 +795,9 @@ Controllers.getSalesTransferByEmployees = async (req, res) => {
           baseTransfer: 1,
           // Hora de creación
           createdAt: 1,
+          cashierName: 1,
+          cashierId: 1,
+          typeShipment: 1,
           _id: 0,
         },
       },
@@ -2223,6 +2237,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
         byItemShipmentEnvio,
         byItemSaleLocal,
         byQuantitySalePedido,
+        byWeekCosts,
       ] = await Promise.all([
         // byItemWeek
         Sale.aggregate([
@@ -2238,6 +2253,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
               employee: 1,
               items: 1,
               devolutionItems: 1,
+              total: 1,
               createdAt: 1,
               week: { $isoWeek: "$createdAt" },
             },
@@ -2247,6 +2263,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
               _id: { week: "$week", employee: "$employee" },
               totalItems: { $sum: "$items" },
               totalDevolutionItems: { $sum: "$devolutionItems" },
+              totalSale: { $sum: "$total" },
             },
           },
           {
@@ -2320,6 +2337,29 @@ Controllers.getReportsByEmployees = async (req, res) => {
               total: { $sum: 1 },
             },
           },
+        ]),
+
+        // byWeekCosts
+        Cost.aggregate([
+          {
+            $match: {
+              store,
+              createdAt: { $gte: fromDate, $lt: toDate },
+            },
+          },
+          {
+            $project: {
+              amount: 1,
+              week: { $isoWeek: "$createdAt" },
+            },
+          },
+          {
+            $group: {
+              _id: "$week",
+              totalGastos: { $sum: "$amount" },
+            },
+          },
+          { $sort: { _id: 1 } },
         ]),
       ]);
 
@@ -2396,6 +2436,34 @@ Controllers.getReportsByEmployees = async (req, res) => {
 
       const totalItemsByConcept = concepts.reduce((acc, c) => acc + c.items, 0);
 
+      // Construir byWeekFinancials: venta $, gastos y totalCaja por semana
+      const byWeekGastosMap = new Map();
+      for (const wc of byWeekCosts) {
+        byWeekGastosMap.set(wc._id, wc.totalGastos);
+      }
+
+      const byWeekSalesMap = new Map();
+      for (const entry of byItemWeek) {
+        const week = entry._id.week;
+        byWeekSalesMap.set(week, (byWeekSalesMap.get(week) || 0) + (entry.totalSale || 0));
+      }
+
+      const allWeeksSet = new Set([...byWeekGastosMap.keys(), ...byWeekSalesMap.keys()]);
+      const byWeekFinancials = Array.from(allWeeksSet).sort((a, b) => a - b).map((week) => {
+        const range = weekRangeMap.get(week);
+        const venta = byWeekSalesMap.get(week) || 0;
+        const gastos = byWeekGastosMap.get(week) || 0;
+        return {
+          week,
+          weekdays: range
+            ? `${week} (${formatDateDM(range.minDate)}-${formatDateDM(range.maxDate)})`
+            : `${week}`,
+          venta,
+          gastos,
+          totalCaja: venta - gastos,
+        };
+      });
+
       return {
         byItemWeek: normalizeByWeeks(
           formatResult(byItemWeek, (e) => {
@@ -2404,6 +2472,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
               week: e._id.week,
               items: e.totalItems,
               devolutionItems: e.totalDevolutionItems || 0,
+              totalSale: e.totalSale || 0,
               weekdays: range
                 ? `${e._id.week} (${formatDateDM(range.minDate)}-${formatDateDM(range.maxDate)})`
                 : `${e._id.week}`,
@@ -2442,6 +2511,7 @@ Controllers.getReportsByEmployees = async (req, res) => {
             0,
           ),
         },
+        byWeekFinancials,
       };
     };
 

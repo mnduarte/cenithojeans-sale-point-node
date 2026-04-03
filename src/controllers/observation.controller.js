@@ -64,6 +64,53 @@ Controllers.getObservations = async (req, res) => {
   }
 };
 
+Controllers.getObservationsByDate = async (req, res) => {
+  try {
+    const { startDate, endDate, store } = req.query;
+
+    const start = new Date(startDate);
+    const end = new Date(
+      new Date(endDate).setDate(new Date(endDate).getDate() + 1)
+    );
+
+    const query = {
+      createdAt: {
+        $gte: start,
+        $lt: end,
+      },
+    };
+
+    if (store) {
+      query.store = store;
+    }
+
+    const observations = await Observation.aggregate([
+      { $match: query },
+      {
+        $project: {
+          id: "$_id",
+          observation: 1,
+          store: 1,
+          username: 1,
+          _id: 0,
+          date: {
+            $dateToString: {
+              format: "%d/%m/%Y",
+              date: "$createdAt",
+            },
+          },
+        },
+      },
+      { $sort: { createdAt: 1 } },
+    ]);
+
+    res.send({ results: observations });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error al buscar observaciones" });
+  }
+};
+
 module.exports = {
   Controllers,
 };
