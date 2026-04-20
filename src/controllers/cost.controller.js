@@ -156,37 +156,33 @@ Controllers.getCosts = async (req, res) => {
           typeShipmentCashierName: 1,
         },
       },
-      {
-        $lookup: {
-          from: "sales",
-          let: { numOrder: "$numOrder" },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $ne: ["$$numOrder", null] },
-                    { $ne: ["$$numOrder", ""] },
-                    { $eq: [{ $toString: "$order" }, "$$numOrder"] },
-                  ],
-                },
-              },
-            },
-            { $limit: 1 },
-            { $project: { accountForTransfer: 1, _id: 0 } },
-          ],
-          as: "_sale",
-        },
-      },
-      {
-        $addFields: {
-          accountForTransfer: {
-            $arrayElemAt: ["$_sale.accountForTransfer", 0],
-          },
-        },
-      },
-      { $project: { _sale: 0 } },
     ]);
+
+    // Batch lookup: collect unique numOrders and fetch matching sales in ONE query
+    const uniqueNumOrders = [
+      ...new Set(
+        costs
+          .map((c) => c.numOrder)
+          .filter((n) => n != null && n !== "")
+      ),
+    ];
+
+    let salesMap = {};
+    if (uniqueNumOrders.length > 0) {
+      const orderNumbers = uniqueNumOrders.map(Number).filter((n) => !isNaN(n));
+      const sales = await Sale.aggregate([
+        { $match: { order: { $in: orderNumbers } } },
+        { $project: { order: 1, accountForTransfer: 1, _id: 0 } },
+      ]);
+      for (const sale of sales) {
+        salesMap[String(sale.order)] = sale.accountForTransfer || null;
+      }
+    }
+
+    // Merge accountForTransfer into costs
+    for (const cost of costs) {
+      cost.accountForTransfer = cost.numOrder ? (salesMap[cost.numOrder] || null) : null;
+    }
 
     const updatedCostsForItems = adjustItemsForCosts(costs);
 

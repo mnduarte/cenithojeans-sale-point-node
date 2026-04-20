@@ -14,10 +14,14 @@ const env = process.env.NODE_ENV || "stg";
 const databases = [MongoConfig];
 
 databases.forEach((database) => {
-  mongoose.connect(database[env].build(), {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
+  mongoose
+    .connect(database[env].build(), {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    })
+    .catch((err) => {
+      console.error(`Failed to connect to ${database.name} (${env}):`, err.message);
+    });
   const db = mongoose.connection;
   db.on(
     "error",

@@ -303,6 +303,9 @@ Controllers.getOrders = async (req, res) => {
           itemsCashierName: 1,
           totalCashierId: 1,
           totalCashierName: 1,
+          itemsDevolutionJeans: 1,
+          itemsDevolutionRemeras: 1,
+          devolutionItems: 1,
         },
       },
     ]);
@@ -420,6 +423,9 @@ Controllers.getOrdersCheckoutDate = async (req, res) => {
           itemsCashierName: 1,
           totalCashierId: 1,
           totalCashierName: 1,
+          itemsDevolutionJeans: 1,
+          itemsDevolutionRemeras: 1,
+          devolutionItems: 1,
         },
       },
     ]);

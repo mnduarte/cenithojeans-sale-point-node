@@ -12,7 +12,7 @@ module.exports = {
       // Usa variable de entorno si existe, sino usa el valor por defecto
       return (
         process.env.MONGO_URI ||
-        "mongodb+srv://cenithojeans:vNlQiXU07ijyhmfA@cluster-sales-point-cen.2gdhwkr.mongodb.net/?retryWrites=true&w=majority"
+        "mongodb://cenithojeans:vNlQiXU07ijyhmfA@ac-zhzwztv-shard-00-00.2gdhwkr.mongodb.net:27017,ac-zhzwztv-shard-00-01.2gdhwkr.mongodb.net:27017,ac-zhzwztv-shard-00-02.2gdhwkr.mongodb.net:27017/?ssl=true&replicaSet=atlas-lajtn5-shard-0&authSource=admin&retryWrites=true&w=majority"
       );
     },
   },
